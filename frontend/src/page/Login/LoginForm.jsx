@@ -213,7 +213,7 @@ const LoginForm = () => {
         </button>
 
         <div className="flex flex-col items-center justify-center mb-8 gap-3">
-            <img src="/landing-logo.png" alt="SHIVALIK" className={`h-16 object-contain rounded-xl ${isDark ? '' : 'shadow-sm drop-shadow-md'}`} />
+            <img src="/image.png" alt="SHIVALIK" className={`h-16 object-contain rounded-xl ${isDark ? '' : 'shadow-sm drop-shadow-md'}`} />
         </div>
 
         <h1 className={`text-xl whitespace-nowrap font-black mb-2 text-center tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Welcome To SHIVALIK</h1>
