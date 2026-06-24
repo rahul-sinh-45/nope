@@ -1,0 +1,17 @@
+{
+  "name": "DhanLaxmi",
+  "short_name": "DhanLaxmi",
+  "description": "Premium Trading Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/logo_pwa.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
