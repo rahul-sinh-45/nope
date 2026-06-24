@@ -79,7 +79,7 @@ export default function LandingPage({ isAboutMode = false, onClose }) {
       <nav className={`lp-nav ${isMobileMenuOpen ? 'menu-open' : ''}`}>
         <a href="/" className="lp-nav-logo" onClick={e => e.preventDefault()}>
           <img src="/landing-logo.png" alt="Shivalik" />
-          <span>Shivalik</span>
+          <span>SHIVALIK</span>
         </a>
         <div className="lp-nav-links">
           <a href="#features">Features</a>
@@ -206,9 +206,9 @@ export default function LandingPage({ isAboutMode = false, onClose }) {
         </div>
         <div className="lp-footer-bottom">
           <div className="lp-footer-copy">© 2026 Shivalik Capital Pvt. Ltd.</div>
-          <div className="lp-footer-legal">
+          {/* <div className="lp-footer-legal">
             SEBI Registration No: INZ000000000 | NSE Member Code: 00000
-          </div>
+          </div> */}
         </div>
       </section>
 
