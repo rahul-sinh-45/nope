@@ -15,6 +15,7 @@ const OptionStrikeBottomWindow = ({
     expiry,              // String
     tradingSymbol,       // String (optional, exact symbol from backend)
     segment,             // String (optional, exact segment from backend)
+    lot_size_prop,       // NUMBER (optional, passed from strike)
     brokerId,
     customerId,
 }) => {
@@ -57,7 +58,7 @@ const OptionStrikeBottomWindow = ({
     const bestAsk = liveDataFull?.bestAskPrice || liveData?.bestAskPrice || 0;
 
     // Lot Size
-    const lotSize = underlyingStock?.lot_size || underlyingStock?.lotSize || 50;
+    const lotSize = lot_size_prop || underlyingStock?.lot_size || underlyingStock?.lotSize || 50;
 
     // Reset on Open + Fetch jobbing from DB
     useEffect(() => {

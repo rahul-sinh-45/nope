@@ -291,6 +291,7 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
                                             type: 'CE', 
                                             instrumentToken: row.call.instrument_token, 
                                             tradingSymbol: row.call.tradingsymbol,
+                                            lot_size: row.call.lot_size,
                                             expiry: selectedExpiry || expiries?.[0] 
                                         })}
                                     >
@@ -306,6 +307,7 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
                                             type: 'PE', 
                                             instrumentToken: row.put.instrument_token, 
                                             tradingSymbol: row.put.tradingsymbol,
+                                            lot_size: row.put.lot_size,
                                             expiry: selectedExpiry || expiries?.[0] 
                                         })}
                                     >
@@ -338,6 +340,7 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
                 underlyingStock={selectedStock}
                 spotPrice={currentPrice}
                 expiry={selectedStrike?.expiry}
+                lot_size_prop={selectedStrike?.lot_size}
                 brokerId={brokerId}
                 customerId={customerId}
             />

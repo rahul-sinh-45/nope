@@ -53,8 +53,8 @@ const NavBar = () => {
             {/* Desktop Header/Navigation Bar (Visible at the TOP on large screens) */}
             <header className="hidden lg:flex justify-between items-center px-6 py-2 bg-[var(--bg-nav)] border-b border-[var(--border-color)]">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center border border-[var(--border-color)]">
-                        <span className="text-white font-bold text-lg font-sans">DL</span>
+                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-indigo-500/30 shadow-lg">
+                        <img src="/image.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-xl font-bold text-[var(--text-primary)]">{localStorage.getItem('organizationName') || 'SHIVALIK'}</span>
                 </div>

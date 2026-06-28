@@ -4,6 +4,15 @@ import { useMarketData } from '../contexts/MarketDataContext';
 
 const apiBase = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:8080';
 
+const UNDERLYING_MAPPING = {
+  'NIFTY 50': 'NIFTY',
+  'NIFTY BANK': 'BANKNIFTY',
+  'NIFTY FIN SERVICE': 'FINNIFTY',
+  'NIFTY MID SELECT': 'MIDCPNIFTY',
+  'SENSEX': 'SENSEX',
+  'BANKEX': 'BANKEX'
+};
+
 /**
  * Custom hook to fetch and manage option chain data with live WebSocket updates
  * @param {Object} params - { name, segment, expiry }
@@ -36,7 +45,8 @@ export function useOptionChain({ name, segment, expiry }) {
       return;
     }
 
-    const params = new URLSearchParams({ name });
+    const normalizedName = UNDERLYING_MAPPING[name] || name;
+    const params = new URLSearchParams({ name: normalizedName });
     if (segment) params.append('segment', segment);
     if (expiry) params.append('expiry', expiry);
 
@@ -97,7 +107,8 @@ export function useOptionChain({ name, segment, expiry }) {
   const fetchExpiries = useCallback(async () => {
     if (!name) return;
 
-    const params = new URLSearchParams({ name });
+    const normalizedName = UNDERLYING_MAPPING[name] || name;
+    const params = new URLSearchParams({ name: normalizedName });
     if (segment) params.append('segment', segment);
 
     console.log('[useOptionChain] Fetching expiries for:', name);

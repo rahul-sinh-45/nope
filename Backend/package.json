@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch server.js",
+    "dev": "node --watch index.js",
     "seed:csv": "node scripts/fetch_master_csv.js",
     "seed:load": "node scripts/load_master_csv.js data/master-detailed.csv",
     "seed": "npm run seed:csv && npm run seed:load"

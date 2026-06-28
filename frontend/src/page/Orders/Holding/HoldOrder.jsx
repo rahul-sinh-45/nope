@@ -37,6 +37,10 @@ export default function HoldOrder({ filter }) {
   const apiBase = import.meta.env.VITE_REACT_APP_API_URL || "";
   const token = localStorage.getItem("token") || null;
 
+  const userString = localStorage.getItem('loggedInUser');
+  const userObject = userString ? JSON.parse(userString) : {};
+  const userRole = userObject.role;
+
   // Segment map no longer needed - using instrument_token directly
 
   const handleOrderSelect = (orderData) => {
@@ -523,7 +527,8 @@ export default function HoldOrder({ filter }) {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - Only visible for brokers */}
+              {userRole === 'broker' && (
               <div className="flex gap-3">
                   <button
                     onClick={() => handleOrderSelect(data)}
@@ -539,11 +544,14 @@ export default function HoldOrder({ filter }) {
                     {isProcessingId === (data._id || data.id) ? 'Exiting...' : 'Exit'}
                   </button>
               </div>
+              )}
 
-              {/* Brokerage tag */}
+              {/* Brokerage tag - Only visible for brokers */}
+              {userRole === 'broker' && (
               <div className="mt-3 text-[8px] text-[#808a9d] text-center opacity-40 font-black uppercase tracking-tighter">
                 Est. Brokerage (entry): -{money(brokerageEntry)}
               </div>
+              )}
             </li>
           );
         })}
@@ -558,4 +566,4 @@ export default function HoldOrder({ filter }) {
       )}
     </>
   );
-}
+}
