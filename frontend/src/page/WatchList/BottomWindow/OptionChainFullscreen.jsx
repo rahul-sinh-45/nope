@@ -278,34 +278,53 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
             </div>
             {selectedStock?.instrument_token && (
                 <div className="px-4 py-3 bg-[var(--bg-card)] border-t border-[var(--border-color)] flex gap-3 z-10 flex-shrink-0">
-                    <button
-                        onClick={() => setSelectedStrike({
-                            strike: null,
-                            type: 'CE',
-                            instrumentToken: selectedStock.instrument_token,
-                            tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
-                            lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
-                            expiry: selectedStock.expiry,
-                            initialActionTab: 'Buy'
-                        })}
-                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
-                    >
-                        BUY
-                    </button>
-                    <button
-                        onClick={() => setSelectedStrike({
-                            strike: null,
-                            type: 'PE',
-                            instrumentToken: selectedStock.instrument_token,
-                            tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
-                            lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
-                            expiry: selectedStock.expiry,
-                            initialActionTab: 'Sell'
-                        })}
-                        className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-all text-center"
-                    >
-                        SELL
-                    </button>
+                    {selectedStock?.segment === 'INDICES' ? (
+                        <>
+                            <button
+                                onClick={() => setActiveTab('OptionChain')}
+                                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
+                            >
+                                CALL
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('OptionChain')}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-all text-center"
+                            >
+                                PUT
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setSelectedStrike({
+                                    strike: null,
+                                    type: 'CE',
+                                    instrumentToken: selectedStock.instrument_token,
+                                    tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
+                                    lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
+                                    expiry: selectedStock.expiry,
+                                    initialActionTab: 'Buy'
+                                })}
+                                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
+                            >
+                                BUY
+                            </button>
+                            <button
+                                onClick={() => setSelectedStrike({
+                                    strike: null,
+                                    type: 'PE',
+                                    instrumentToken: selectedStock.instrument_token,
+                                    tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
+                                    lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
+                                    expiry: selectedStock.expiry,
+                                    initialActionTab: 'Sell'
+                                })}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-all text-center"
+                            >
+                                SELL
+                            </button>
+                        </>
+                    )}
                 </div>
             )}
         </div>
