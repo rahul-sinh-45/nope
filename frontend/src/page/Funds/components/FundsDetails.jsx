@@ -288,7 +288,7 @@ export default function FundsDetails({
           "option"
         )}
 
-        {renderMarginSection(
+        {/* {renderMarginSection(
           `MCX Limit (${mcxPercentage}%)`,
           finalMcxAvailable,
           finalMcxUsed,
@@ -296,7 +296,7 @@ export default function FundsDetails({
           "bg-purple-500",
           PieChart,
           "mcx"
-        )}
+        )} */}
       </div>
     </div>
   );

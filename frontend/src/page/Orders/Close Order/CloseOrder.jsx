@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { ShoppingCart, DollarSign, Hash, Zap, XCircle, Clock, Layers, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import ClosedOrderFilter from "./CloseOrderFilter";
@@ -107,8 +107,8 @@ const SwipeableClosedOrderItem = ({ data, onSelect, onDelete }) => {
                             <span className="text-[7px] font-black text-[var(--text-muted)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded uppercase">
                                 {data.segment || "NFO"}
                             </span>
-                            <span className="text-[7px] font-black text-[var(--loss-text)] bg-[var(--loss-chip-bg)] px-1.5 py-0.5 rounded uppercase">
-                                CLOSED
+                            <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase ${data.order_status === 'RESTRICTED' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-[var(--loss-text)] bg-[var(--loss-chip-bg)]'}`}>
+                                {data.order_status || "CLOSED"}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-[9px] font-black text-[var(--text-muted)] uppercase">
@@ -120,30 +120,51 @@ const SwipeableClosedOrderItem = ({ data, onSelect, onDelete }) => {
                         </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[var(--text-primary)] font-black text-lg leading-none mb-1.5 text-right">
-                            ₹{exitPrice.toFixed(2)}
-                        </div>
-                        <div className={`text-[9px] font-black px-2.5 py-1 rounded-full ${pnlChipBg} ${pnlTextColor}`}>
-                            {pctText}
-                        </div>
+                        {data.order_status === 'RESTRICTED' ? (
+                            <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                                Restricted
+                            </span>
+                        ) : (
+                            <>
+                                <div className="text-[var(--text-primary)] font-black text-lg leading-none mb-1.5 text-right">
+                                    ₹{exitPrice.toFixed(2)}
+                                </div>
+                                <div className={`text-[9px] font-black px-2.5 py-1 rounded-full ${pnlChipBg} ${pnlTextColor}`}>
+                                    {pctText}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
                 {/* Info Grid */}
-                <div className="grid grid-cols-3 gap-2 bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]/30 text-center">
-                    <div className="flex flex-col gap-1">
-                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Entry Price</p>
-                        <p className="text-xs font-black text-[var(--text-primary)]">₹{entryPrice.toFixed(2)}</p>
+                {data.order_status === 'RESTRICTED' ? (
+                    <div className="grid grid-cols-2 gap-2 bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]/30 text-center">
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Entry Price</p>
+                            <p className="text-xs font-black text-[var(--text-primary)]">₹{entryPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Quantity</p>
+                            <p className="text-xs font-black text-[var(--text-primary)]">{qty}</p>
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Exit Price</p>
-                        <p className="text-xs font-black text-[var(--text-primary)]">₹{exitPrice.toFixed(2)}</p>
+                ) : (
+                    <div className="grid grid-cols-3 gap-2 bg-[var(--bg-primary)] p-4 rounded-2xl border border-[var(--border-color)]/30 text-center">
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Entry Price</p>
+                            <p className="text-xs font-black text-[var(--text-primary)]">₹{entryPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Exit Price</p>
+                            <p className="text-xs font-black text-[var(--text-primary)]">₹{exitPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Net P&L</p>
+                            <p className={`text-xs font-black ${pnlTextColor}`}>₹{netPnl.toFixed(2)}</p>
+                        </div>
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <p className="text-[8px] font-black text-[var(--text-muted)] uppercase opacity-60">Net P&L</p>
-                        <p className={`text-xs font-black ${pnlTextColor}`}>₹{netPnl.toFixed(2)}</p>
-                    </div>
-                </div>
+                )}
             </motion.div>
         </div>
     );
@@ -164,6 +185,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
     const [feedback, setFeedback] = useState(null);
 
     const [isEditing, setIsEditing] = useState(false);
+    const [editQty, setEditQty] = useState('');
     const [editEntry, setEditEntry] = useState('');
     const [editExit, setEditExit] = useState('');
     const [editDate, setEditDate] = useState('');
@@ -192,6 +214,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
 
     // Initialize edit values on mount/change
     useEffect(() => {
+        setEditQty(qty);
         setEditEntry(entryPrice);
         setEditExit(exitPrice);
         const d = closed_at ? new Date(closed_at) : new Date();
@@ -200,7 +223,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
         
         setIsEditing(false); // Reset edit mode when order changes
         setFeedback(null);
-    }, [selectedOrder, entryPrice, exitPrice, closed_at]);
+    }, [selectedOrder, qty, entryPrice, exitPrice, closed_at]);
 
 
     // 🔹 EXIT P&L + FULL BROKERAGE (entry + exit) helper se
@@ -311,8 +334,9 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
 
             const payload = {
                 order_id: orderId,
+                quantity: Number(editQty),
                 price: Number(editEntry),
-                closed_ltp: Number(editExit),
+                closed_ltp: isRestricted ? undefined : Number(editExit),
                 closed_at: editDate ? new Date(editDate).toISOString() : null
             };
 
@@ -348,6 +372,8 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
     };
 
 
+    const isRestricted = selectedOrder.order_status === "RESTRICTED";
+
     return (
         <div className="open-order-bottom-window fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-card)] border-t border-[var(--border-color)] shadow-2xl p-4 transition-transform duration-300 max-h-[90vh] overflow-y-auto">
             {/* Header */}
@@ -381,43 +407,68 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
             )}
 
             {/* P&L Display - LIVE UPDATE DURING EDIT */}
-            <div className="mb-4 flex justify-between items-end">
-                <div>
-                    <p className="text-xl font-bold">
-                        <span className="text-[var(--text-secondary)] mr-1">₹</span>
-                        <span className="text-[var(--text-primary)]">{isEditing ? currentExit.toFixed(2) : exitPrice.toFixed(2)}</span>
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">Exit Price</p>
+            {!isRestricted && (
+                <div className="mb-4 flex justify-between items-end">
+                    <div>
+                        <p className="text-xl font-bold">
+                            <span className="text-[var(--text-secondary)] mr-1">₹</span>
+                            <span className="text-[var(--text-primary)]">{isEditing ? currentExit.toFixed(2) : exitPrice.toFixed(2)}</span>
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">Exit Price</p>
+                    </div>
+                    <div className="text-right">
+                        <span className={`text-xl font-bold px-2.5 py-1 rounded-lg ${pnlChipBg} ${pnlTextColor}`}>{money(netPnl)}</span>
+                        <p className="text-xs text-[var(--text-muted)] mt-1.5">Realized P&L (After Brokerage)</p>
+                    </div>
                 </div>
-                <div className="text-right">
-                    <span className={`text-xl font-bold px-2.5 py-1 rounded-lg ${pnlChipBg} ${pnlTextColor}`}>{money(netPnl)}</span>
-                    <p className="text-xs text-[var(--text-muted)] mt-1.5">Realized P&L (After Brokerage)</p>
+            )}
+
+            {isRestricted && (
+                <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
+                    <p className="text-amber-500 text-sm font-bold uppercase tracking-wider">Restricted Position</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">This order is restricted. It can be re-opened to resume trading.</p>
                 </div>
-            </div>
+            )}
 
             {/* Brokerage Breakdown */}
-            <div className="mb-3 p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] text-[11px]">
-                <div className="flex justify-between text-[var(--text-secondary)] mb-1">
-                    <span>Gross P&L</span>
-                    <span className="font-medium">{money(grossPnl)}</span>
+            {!isRestricted && (
+                <div className="mb-3 p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] text-[11px]">
+                    <div className="flex justify-between text-[var(--text-secondary)] mb-1">
+                        <span>Gross P&L</span>
+                        <span className="font-medium">{money(grossPnl)}</span>
+                    </div>
+                    <div className="flex justify-between text-[var(--text-secondary)] mb-1">
+                        <span>Entry Brokerage 0.01%</span>
+                        <span className="text-[var(--loss-text)]">-{money(brokerageEntry)}</span>
+                    </div>
+                    <div className="flex justify-between text-[var(--text-secondary)]">
+                        <span>Exit Brokerage 0.01%</span>
+                        <span className="text-[var(--loss-text)]">-{money(brokerageExit)}</span>
+                    </div>
+                    <div className="flex justify-between mt-2 border-t border-[var(--border-color)] pt-2 font-bold uppercase tracking-tighter">
+                        <span>Net Realized</span>
+                        <span className={pnlTextColor}>{money(netPnl)} ({pct.toFixed(2)}%)</span>
+                    </div>
                 </div>
-                <div className="flex justify-between text-[var(--text-secondary)] mb-1">
-                    <span>Entry Brokerage 0.01%</span>
-                    <span className="text-[var(--loss-text)]">-{money(brokerageEntry)}</span>
-                </div>
-                <div className="flex justify-between text-[var(--text-secondary)]">
-                    <span>Exit Brokerage 0.01%</span>
-                    <span className="text-[var(--loss-text)]">-{money(brokerageExit)}</span>
-                </div>
-                <div className="flex justify-between mt-2 border-t border-[var(--border-color)] pt-2 font-bold uppercase tracking-tighter">
-                    <span>Net Realized</span>
-                    <span className={pnlTextColor}>{money(netPnl)} ({pct.toFixed(2)}%)</span>
-                </div>
-            </div>
+            )}
 
             {/* Details Grid (Compact) */}
             <div className="mb-4 p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] text-xs space-y-1.5">
-                <DetailRow label="Quantity" value={`${qty} shares`} />
+                
+                {/* EDITABLE QUANTITY */}
+                <div className="flex justify-between items-center py-0.5 px-2">
+                    <div className="flex items-center text-[var(--text-secondary)]"><span className="text-xs">Quantity</span></div>
+                    {isEditing ? (
+                        <input
+                            type="number"
+                            value={editQty}
+                            onChange={(e) => setEditQty(e.target.value)}
+                            className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded px-2 py-1 text-right w-24 text-[var(--text-primary)] focus:outline-none focus:border-[#3b82f6]"
+                        />
+                    ) : (
+                        <span className="text-sm font-medium text-[var(--text-primary)]">{qty} shares</span>
+                    )}
+                </div>
 
                 {/* EDITABLE ENTRY PRICE */}
                 <div className="flex justify-between items-center py-0.5 px-2">
@@ -435,25 +486,31 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
                 </div>
 
                 {/* EDITABLE EXIT PRICE */}
-                <div className="flex justify-between items-center py-0.5 px-2">
-                    <div className="flex items-center text-[var(--text-secondary)]"><span className="text-xs">Exit Price</span></div>
-                    {isEditing ? (
-                        <input
-                            type="number"
-                            value={editExit}
-                            onChange={(e) => setEditExit(e.target.value)}
-                            className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded px-2 py-1 text-right w-24 text-[var(--text-primary)] focus:outline-none focus:border-[#3b82f6]"
-                        />
-                    ) : (
-                        <span className="text-sm font-medium text-[var(--text-primary)]">{money(exitPrice)}</span>
-                    )}
-                </div>
+                {!isRestricted && (
+                    <div className="flex justify-between items-center py-0.5 px-2">
+                        <div className="flex items-center text-[var(--text-secondary)]"><span className="text-xs">Exit Price</span></div>
+                        {isEditing ? (
+                            <input
+                                type="number"
+                                value={editExit}
+                                onChange={(e) => setEditExit(e.target.value)}
+                                className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded px-2 py-1 text-right w-24 text-[var(--text-primary)] focus:outline-none focus:border-[#3b82f6]"
+                            />
+                        ) : (
+                            <span className="text-sm font-medium text-[var(--text-primary)]">{money(exitPrice)}</span>
+                        )}
+                    </div>
+                )}
 
                 <DetailRow label="Type" value={orderSide} />
                 <DetailRow label="Product" value={productType} colorClass="text-[#3b82f6]" />
                 <DetailRow label="From" value={came_From} colorClass="text-[#3b82f6]" />
+                
+                {/* EDITABLE CLOSED / RESTRICTED AT DATE */}
                 <div className="flex justify-between items-center py-0.5 px-2">
-                    <div className="flex items-center text-[var(--text-secondary)]"><span className="text-xs">Closed At</span></div>
+                    <div className="flex items-center text-[var(--text-secondary)]">
+                        <span className="text-xs">{isRestricted ? "Restricted At" : "Closed At"}</span>
+                    </div>
                     {isEditing ? (
                         <input
                             type="datetime-local"
@@ -465,6 +522,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
                         <span className="text-[var(--text-muted)] text-xs font-medium">{closedTime}</span>
                     )}
                 </div>
+                
                 <DetailRow label="Expire Date" value={formattedStockExpireDate} colorClass="text-[var(--text-muted)] text-xs" />
             </div>
 
@@ -496,8 +554,8 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
                             Close
                         </button>
 
-                        {/* Condition: User must be Broker AND (Not Hold/Overnight OR Market Open) */}
-                        {userRole === 'broker' && ((came_From !== 'Hold' && came_From !== 'Overnight') || isOpen) && (
+                        {/* Condition: User must be Broker AND (Not Hold/Overnight OR Market Open OR Restricted) */}
+                        {String(userRole || '').toLowerCase() === 'broker' && (isRestricted || (came_From !== 'Hold' && came_From !== 'Overnight') || isOpen) && (
                             <button
                                 onClick={handleReopen}
                                 disabled={submitting}
@@ -527,6 +585,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
 export default function ClosedOrder({ filter }) {
     const [closedOrders, setClosedOrders] = useState([]);
     const [filteredOrders, setFilteredOrders] = useState([]);
+    const [subTab, setSubTab] = useState('CLOSED'); // 'CLOSED' or 'RESTRICTED'
     const [loader, setLoader] = useState(true);
     const [error, setError] = useState(null);
     const [selectedOrderData, setSelectedOrderData] = useState(null);
@@ -601,6 +660,10 @@ export default function ClosedOrder({ filter }) {
         setFilteredOrders(filtered);
     }, [closedOrders, filter]);
 
+    const displayList = useMemo(() => {
+        return filteredOrders.filter(o => o.order_status === subTab);
+    }, [filteredOrders, subTab]);
+
     const fetchClosedOrders = async () => {
         if (!brokerId || !customerId) {
             setLoader(false);
@@ -608,7 +671,7 @@ export default function ClosedOrder({ filter }) {
         }
         setLoader(true);
         try {
-            const endPoint = `${apiBase.replace(/\/$/, "")}/api/orders/getOrderInstrument?broker_id_str=${brokerId}&customer_id_str=${customerId}&orderStatus=${orderStatus}`;
+            const endPoint = `${apiBase.replace(/\/$/, "")}/api/orders/getOrderInstrument?broker_id_str=${brokerId}&customer_id_str=${customerId}&orderStatus=ALL`;
             const res = await fetch(endPoint, {
                 method: "GET",
                 headers: {
@@ -627,8 +690,12 @@ export default function ClosedOrder({ filter }) {
 
             const data = await res.json();
             const orders = Array.isArray(data?.ordersInstrument) ? data.ordersInstrument : (Array.isArray(data) ? data : []);
+            
+            // Only CLOSED or RESTRICTED
+            const targetOrders = orders.filter(o => o.order_status === 'CLOSED' || o.order_status === 'RESTRICTED');
+
             // Sort by latest activity (closed_at, updatedAt, or createdAt) desc
-            const sortedOrders = [...orders].sort((a, b) => {
+            const sortedOrders = [...targetOrders].sort((a, b) => {
                 const getTime = (o) => {
                     const dates = [o.closed_at, o.closedAt, o.updatedAt, o.createdAt]
                         .filter(Boolean)
@@ -771,9 +838,27 @@ export default function ClosedOrder({ filter }) {
 
                 {/* Right: Order List */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    {/* Modern Sub-Tab Toggle */}
+                    <div className="flex gap-2 mb-3 bg-[var(--bg-secondary)] p-1 rounded-2xl flex-shrink-0">
+                        <button
+                            onClick={() => setSubTab('CLOSED')}
+                            className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all duration-200 ${subTab === 'CLOSED' ? 'bg-[#1e293b] text-white shadow-lg border border-white/5' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            Closed Positions
+                        </button>
+                        <button
+                            onClick={() => setSubTab('RESTRICTED')}
+                            className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all duration-200 ${subTab === 'RESTRICTED' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                        >
+                            Restricted
+                        </button>
+                    </div>
+
                     <div className="flex justify-between items-center mb-2 flex-shrink-0">
-                        <h3 className="text-[var(--text-secondary)] text-sm">Closed Orders ({filteredOrders.length})</h3>
-                        {filteredOrders.length > 0 && userRole === 'broker' && (
+                        <h3 className="text-[var(--text-secondary)] text-sm">
+                            {subTab === 'RESTRICTED' ? 'Restricted Orders' : 'Closed Orders'} ({displayList.length})
+                        </h3>
+                        {displayList.length > 0 && userRole === 'broker' && (
                             <button
                                 onClick={handleDeleteAllClick}
                                 className="flex items-center gap-1 text-xs text-red-500 hover:text-red-400 bg-red-500/10 px-2 py-1 rounded"
@@ -790,13 +875,13 @@ export default function ClosedOrder({ filter }) {
                             <OrderCardSkeleton />
                             <OrderCardSkeleton />
                         </div>
-                    ) : filteredOrders.length === 0 ? (
+                    ) : displayList.length === 0 ? (
                         <div className="text-[var(--text-muted)] text-center py-8 text-[10px] font-black uppercase tracking-widest italic">
-                            No closed positions found.
+                            No {subTab === 'RESTRICTED' ? 'restricted' : 'closed'} positions found.
                         </div>
                     ) : (
                         <div className="flex-1 overflow-y-auto pb-24 px-1">
-                            {filteredOrders.map((data, idx) => (
+                            {displayList.map((data, idx) => (
                                 <SwipeableClosedOrderItem
                                     key={data._id || idx}
                                     data={data}

@@ -2,8 +2,12 @@ import express from "express";
 import { protect } from "../Middleware/authMiddleware.js";
 import UserWatchlist from "../Model/UserWatchlistModel.js";
 import Instrument from "../Model/InstrumentModel.js";
+import { resolveEffectiveBrokerIdMiddleware } from "../Middleware/resolveEffectiveBrokerId.js";
 
 const router = express.Router();
+
+router.use(resolveEffectiveBrokerIdMiddleware);
+
 
 // @desc    Get user's watchlist
 // @route   GET /api/watchlist

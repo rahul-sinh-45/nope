@@ -2,18 +2,32 @@ import { API_URL } from '../config.js';
 
 export const getFundsData = async () => {
     try {
+        const activeContextString = localStorage.getItem("activeContext");
         const apiBase = API_URL;
         const token = localStorage.getItem("token");
-        const activeContextString = localStorage.getItem('activeContext');
+        let brokerIdVal = null;
+        let customerIdVal = null;
 
-        if (!token || !activeContextString) return null;
+        if (activeContextString) {
+            try {
+                const activeContext = JSON.parse(activeContextString);
+                brokerIdVal = activeContext.brokerId;
+                customerIdVal = activeContext.customerId;
+            } catch (e) {}
+        }
 
-        const { brokerId, customerId } = JSON.parse(activeContextString);
+        // Fallbacks
+        const globalBrokerId = localStorage.getItem('associatedBrokerStringId');
+        const userString = localStorage.getItem('loggedInUser');
+        const userObject = userString ? JSON.parse(userString) : {};
 
-        if (!brokerId || !customerId) return null;
+        const finalBrokerId = brokerIdVal || globalBrokerId;
+        const finalCustomerId = customerIdVal || (userObject.role === 'customer' ? userObject.id : null);
+
+        if (!finalBrokerId || !finalCustomerId) return null;
 
         // *** FIX: Ensure NO SPACES in query params ***
-        const endpoint = `${apiBase}/api/funds/getFunds?broker_id_str=${brokerId}&customer_id_str=${customerId}`;
+        const endpoint = `${apiBase}/api/funds/getFunds?broker_id_str=${finalBrokerId}&customer_id_str=${finalCustomerId}`;
 
         const response = await fetch(endpoint, {
             method: "GET",

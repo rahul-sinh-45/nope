@@ -191,10 +191,10 @@ export function useOptionChain({ name, segment, expiry }) {
     // Store for cleanup
     subscribedTokensRef.current = subscriptionList;
 
-    console.log(`[useOptionChain] Subscribing to ${subscriptionList.length} option contracts (ticker mode)`);
+    console.log(`[useOptionChain] Subscribing to ${subscriptionList.length} option contracts (quote mode)`);
 
-    // Subscribe with 'ticker' packet type for LTP-only updates
-    subscribe(subscriptionList, 'ticker');
+    // Subscribe with 'quote' packet type for LTP and volume updates
+    subscribe(subscriptionList, 'quote');
 
   }, [isConnected, subscribe]);
 
@@ -206,7 +206,7 @@ export function useOptionChain({ name, segment, expiry }) {
 
     console.log('[useOptionChain] Unsubscribing from', subscribedTokensRef.current.length, 'option contracts');
 
-    unsubscribe(subscribedTokensRef.current, 'ticker');
+    unsubscribe(subscribedTokensRef.current, 'quote');
 
     // Clear tracking
     subscribedTokensRef.current = [];
@@ -293,7 +293,7 @@ export function useOptionChain({ name, segment, expiry }) {
       let hasUpdates = false;
       const currentChain = chainDataRef.current;
 
-      const pendingUpdates = new Map(); // index -> { call: ltp, put: ltp }
+      const pendingUpdates = new Map(); // index -> { callLtp, callVolume, putLtp, putVolume }
 
       tokenMapRef.current.forEach((position, token) => {
         // Ticks are keyed by instrument_token directly (Kite format)
@@ -304,13 +304,21 @@ export function useOptionChain({ name, segment, expiry }) {
           const row = currentChain[index];
           if (!row) return;
 
-          const currentLtp = type === 'call' ? row.call?.ltp : row.put?.ltp;
+          const optionData = type === 'call' ? row.call : row.put;
+          const currentLtp = optionData?.ltp;
+          const currentVolume = optionData?.volume || 0;
+          const tickVolume = tick.volume || 0;
 
-          if (currentLtp !== tick.ltp) {
+          if (currentLtp !== tick.ltp || currentVolume !== tickVolume) {
             // Found a change!
             const entry = pendingUpdates.get(index) || {};
-            if (type === 'call') entry.callLtp = tick.ltp;
-            if (type === 'put') entry.putLtp = tick.ltp;
+            if (type === 'call') {
+              entry.callLtp = tick.ltp;
+              entry.callVolume = tickVolume;
+            } else {
+              entry.putLtp = tick.ltp;
+              entry.putVolume = tickVolume;
+            }
             pendingUpdates.set(index, entry);
           }
         }
@@ -324,10 +332,18 @@ export function useOptionChain({ name, segment, expiry }) {
           const newRow = { ...row };
 
           if (updates.callLtp !== undefined && newRow.call) {
-            newRow.call = { ...newRow.call, ltp: updates.callLtp };
+            newRow.call = { 
+              ...newRow.call, 
+              ltp: updates.callLtp,
+              volume: updates.callVolume !== undefined ? updates.callVolume : newRow.call.volume
+            };
           }
           if (updates.putLtp !== undefined && newRow.put) {
-            newRow.put = { ...newRow.put, ltp: updates.putLtp };
+            newRow.put = { 
+              ...newRow.put, 
+              ltp: updates.putLtp,
+              volume: updates.putVolume !== undefined ? updates.putVolume : newRow.put.volume
+            };
           }
           updatedChain[index] = newRow;
         }

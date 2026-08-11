@@ -24,8 +24,9 @@ export default function CustomerPermissions() {
 
   const userString = localStorage.getItem('loggedInUser');
   const userObject = userString ? JSON.parse(userString) : {};
-  // More robust broker ID retrieval
-  const brokerId = userObject.role === 'broker' ? (userObject.id || userObject._id) : null;
+  const activeContextString = localStorage.getItem('activeContext');
+  const activeContext = activeContextString ? JSON.parse(activeContextString) : {};
+  const brokerId = activeContext.brokerId || (userObject.role === 'broker' ? (userObject.id || userObject._id) : null);
   const token = localStorage.getItem('authToken') || localStorage.getItem('token');
   const apiBase = import.meta.env.VITE_REACT_APP_API_URL || "";
 

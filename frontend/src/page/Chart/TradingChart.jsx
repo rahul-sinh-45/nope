@@ -1,6 +1,6 @@
 // TradingChart.jsx - Professional trading chart using TradingView Lightweight Charts
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import { useMarketData } from '../../contexts/MarketDataContext.jsx';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 
@@ -24,6 +24,7 @@ function TradingChart({
   candles = [],
   symbol,
   interval,
+  chartType = 'candle',
   isLiveEnabled = false,
   loading = false
 }) {
@@ -117,20 +118,33 @@ function TradingChart({
 
       console.log('[TradingChart] Chart created successfully');
 
-      // Add candlestick series - Using premium green & red colors
-      const candleSeries = chart.addSeries(CandlestickSeries, {
-        upColor: '#089981',
-        downColor: '#f23645',
-        borderDownColor: '#f23645',
-        borderUpColor: '#089981',
-        wickDownColor: '#f23645',
-        wickUpColor: '#089981',
-        priceFormat: {
-          type: 'price',
-          precision: 2,
-          minMove: 0.01,
-        },
-      });
+      // Add candlestick or line series dynamically - Using premium colors
+      let candleSeries;
+      if (chartType === 'line') {
+        candleSeries = chart.addSeries(LineSeries, {
+          color: '#2962ff',
+          lineWidth: 2,
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+        });
+      } else {
+        candleSeries = chart.addSeries(CandlestickSeries, {
+          upColor: '#089981',
+          downColor: '#f23645',
+          borderDownColor: '#f23645',
+          borderUpColor: '#089981',
+          wickDownColor: '#f23645',
+          wickUpColor: '#089981',
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+        });
+      }
 
       // Add volume series (histogram)
       const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -184,7 +198,7 @@ function TradingChart({
         chartRef.current = null;
       }
     };
-  }, [isDark]); // Re-create chart when theme changes
+  }, [isDark, chartType]); // Re-create chart when theme or chartType changes
 
   // Load historical candles
   useEffect(() => {
@@ -193,8 +207,16 @@ function TradingChart({
     try {
       const transformedCandles = transformCandles(candles);
 
-      // Set candle data
-      candleSeriesRef.current.setData(transformedCandles);
+      // Set candle data based on chartType
+      if (chartType === 'line') {
+        const lineData = transformedCandles.map(candle => ({
+          time: candle.time,
+          value: candle.close
+        }));
+        candleSeriesRef.current.setData(lineData);
+      } else {
+        candleSeriesRef.current.setData(transformedCandles);
+      }
 
       // Set volume data with colors
       const volumeData = transformedCandles.map(candle => ({
@@ -225,7 +247,7 @@ function TradingChart({
     } catch (error) {
       console.error('[TradingChart] Error loading candles:', error);
     }
-  }, [candles]);
+  }, [candles, chartType]);
 
   // REPLACEMENT: Polling Loop for Chart Updates
   useEffect(() => {
@@ -253,13 +275,20 @@ function TradingChart({
 
           // Update Logic
           if (timeSince < intervalMs) {
-            candleSeriesRef.current.update({
-              time: prevTime,
-              open: tick.open || tick.ltp,
-              high: tick.high || tick.ltp,
-              low: tick.low || tick.ltp,
-              close: tick.ltp
-            });
+            if (chartType === 'line') {
+              candleSeriesRef.current.update({
+                time: prevTime,
+                value: tick.ltp
+              });
+            } else {
+              candleSeriesRef.current.update({
+                time: prevTime,
+                open: tick.open || tick.ltp,
+                high: tick.high || tick.ltp,
+                low: tick.low || tick.ltp,
+                close: tick.ltp
+              });
+            }
             if (tick.volume) {
               volumeSeriesRef.current.update({
                 time: prevTime,
@@ -270,13 +299,20 @@ function TradingChart({
             return prevTime; // Time hasn't changed
           } else if (timeSince >= intervalMs && timeSince < intervalMs * 2) {
             const newTime = prevTime + Math.floor(intervalMs / 1000);
-            candleSeriesRef.current.update({
-              time: newTime,
-              open: tick.ltp,
-              high: tick.ltp,
-              low: tick.ltp,
-              close: tick.ltp
-            });
+            if (chartType === 'line') {
+              candleSeriesRef.current.update({
+                time: newTime,
+                value: tick.ltp
+              });
+            } else {
+              candleSeriesRef.current.update({
+                time: newTime,
+                open: tick.ltp,
+                high: tick.ltp,
+                low: tick.ltp,
+                close: tick.ltp
+              });
+            }
             volumeSeriesRef.current.update({
               time: newTime,
               value: tick.volume || 0,
@@ -290,7 +326,7 @@ function TradingChart({
     }, 1000); // 1 Second throttle
 
     return () => clearInterval(intervalId);
-  }, [symbol, isConnected, isLiveEnabled, interval]);
+  }, [symbol, isConnected, isLiveEnabled, interval, chartType]);
 
   if (loading) {
     return (

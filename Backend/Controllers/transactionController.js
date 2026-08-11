@@ -92,8 +92,16 @@ const updateTransactionStatus = asyncHandler(async (req, res) => {
         
         await Fund.findOneAndUpdate(
             { broker_id_str: transaction.broker_id_str, customer_id_str: transaction.customer_id_str },
-            { $inc: { net_available_balance: adjustment } },
-            { upsert: true }
+            { 
+                $inc: { 
+                    net_available_balance: adjustment,
+                    "intraday.available_limit": adjustment,
+                    "intraday.free_limit": adjustment,
+                    "overnight.available_limit": adjustment,
+                    "overnight.free_limit": adjustment
+                } 
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
     }
 

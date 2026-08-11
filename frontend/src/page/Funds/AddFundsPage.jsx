@@ -18,10 +18,17 @@ export default function AddFundsPage() {
 
   const activeContextString = localStorage.getItem('activeContext');
   const activeContext = activeContextString ? JSON.parse(activeContextString) : {};
+  const globalBrokerId = localStorage.getItem('associatedBrokerStringId');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCustomerId = urlParams.get('customerId');
   
   // Identity Logic: Use context for broker managing customer, or userObject for direct customer
-  const brokerId = isBroker ? activeContext.brokerId : (userObject.brokerId || activeContext.brokerId);
-  const customerId = isBroker ? activeContext.customerId : (userObject.id || activeContext.customerId);
+  const brokerId = isBroker 
+    ? (activeContext.brokerId || globalBrokerId) 
+    : (userObject.brokerId || activeContext.brokerId || globalBrokerId);
+  const customerId = isBroker 
+    ? (activeContext.customerId || urlCustomerId) 
+    : (userObject.id || activeContext.customerId || urlCustomerId);
   
   const token = localStorage.getItem("token");
   const apiBase = import.meta.env.VITE_REACT_APP_API_URL || "";

@@ -18,16 +18,18 @@ const OptionStrikeBottomWindow = ({
     lot_size_prop,       // NUMBER (optional, passed from strike)
     brokerId,
     customerId,
+    initialActionTab = 'Buy',
 }) => {
     // --- Market Data Context ---
     const { subscribe, unsubscribe, ticksRef } = useMarketData();
 
     // --- Local States ---
-    const [actionTab, setActionTab] = useState('Buy');
+    const [actionTab, setActionTab] = useState(initialActionTab || 'Buy');
     const [productType, setProductType] = useState('Intraday');
     const [localLotsStr, setLocalLotsStr] = useState('1');
     const [jobbin_price, setJobbin_price] = useState("0.08");
     const [jobbin_type, setJobbin_type] = useState("percentage"); // "percentage" or "points"
+    const [advancedRanges, setAdvancedRanges] = useState([]);
 
     const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState(null);
@@ -65,15 +67,21 @@ const OptionStrikeBottomWindow = ({
         if (isOpen) {
             setLocalLotsStr('1');
             setFeedback(null);
-            setActionTab('Buy');
+            setActionTab(initialActionTab || 'Buy');
             setProductType('Intraday');
             // Fetch jobbing from DB for this customer
             const fetchJobbing = async () => {
                 try {
                     const activeContextString = localStorage.getItem('activeContext');
                     const activeContext = activeContextString ? JSON.parse(activeContextString) : {};
-                    const effectiveBrokerId = brokerId || activeContext.brokerId;
-                    const effectiveCustomerId = customerId || activeContext.customerId;
+                    const globalBrokerId = localStorage.getItem('associatedBrokerStringId');
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const urlCustomerId = urlParams.get('customerId');
+                    const userString = localStorage.getItem('loggedInUser');
+                    const userObject = userString ? JSON.parse(userString) : {};
+
+                    const effectiveBrokerId = brokerId || activeContext.brokerId || globalBrokerId;
+                    const effectiveCustomerId = customerId || activeContext.customerId || urlCustomerId || (userObject.role === 'customer' ? userObject.id : null);
 
                     if (!effectiveBrokerId || !effectiveCustomerId) return;
 
@@ -84,6 +92,15 @@ const OptionStrikeBottomWindow = ({
                         if (data.success && data.jobbing) {
                             setJobbin_price(String(data.jobbing.price ?? 0.08));
                             setJobbin_type(data.jobbing.type || 'percentage');
+                        }
+                    }
+
+                    // Fetch advanced jobbing
+                    const resAdv = await fetch(`${apiBase}/api/advanced-jobbing?broker_id_str=${effectiveBrokerId}&customer_id_str=${effectiveCustomerId}`);
+                    if (resAdv.ok) {
+                        const dataAdv = await resAdv.json();
+                        if (dataAdv.success) {
+                            setAdvancedRanges(dataAdv.ranges || []);
                         }
                     }
                 } catch (err) {
@@ -148,29 +165,49 @@ const OptionStrikeBottomWindow = ({
         return lotsNum * lotSize;
     }, [lotsNum, lotSize]);
 
+    const activeJobbing = useMemo(() => {
+        const ltpVal = ltp || 0;
+        const match = advancedRanges.find(r => ltpVal >= r.start_range && ltpVal <= r.end_range);
+        if (match) {
+            return {
+                price: String(match.jobbing_value),
+                type: match.jobbing_type
+            };
+        }
+        return {
+            price: jobbin_price,
+            type: jobbin_type
+        };
+    }, [ltp, advancedRanges, jobbin_price, jobbin_type]);
+
+    const isRangeMatched = useMemo(() => {
+        const ltpVal = ltp || 0;
+        return advancedRanges.some(r => ltpVal >= r.start_range && ltpVal <= r.end_range);
+    }, [ltp, advancedRanges]);
+
     const jobbinPct = useMemo(() => {
-        if (jobbin_type === 'points') return 0;
-        const v = parseFloat(String(jobbin_price).trim());
+        if (activeJobbing.type === 'points') return 0;
+        const v = parseFloat(String(activeJobbing.price).trim());
         return Number.isFinite(v) ? v / 100 : 0;
-    }, [jobbin_price, jobbin_type]);
+    }, [activeJobbing]);
 
     const jobbinPoints = useMemo(() => {
-        if (jobbin_type !== 'points') return 0;
-        const v = parseFloat(String(jobbin_price).trim());
+        if (activeJobbing.type !== 'points') return 0;
+        const v = parseFloat(String(activeJobbing.price).trim());
         return Number.isFinite(v) ? v : 0;
-    }, [jobbin_price, jobbin_type]);
+    }, [activeJobbing]);
 
     const { adjustedPricePerShare } = useMemo(() => {
         if (!ltp) return { adjustedPricePerShare: 0 };
         let pxRaw;
-        if (jobbin_type === 'points') {
+        if (activeJobbing.type === 'points') {
             pxRaw = actionTab === 'Buy' ? (ltp + jobbinPoints) : (ltp - jobbinPoints);
         } else {
             const perShareFactor = actionTab === 'Buy' ? (1 + jobbinPct) : (1 - jobbinPct);
             pxRaw = ltp * perShareFactor;
         }
         return { adjustedPricePerShare: Number(pxRaw.toFixed(4)) };
-    }, [ltp, actionTab, jobbinPct, jobbinPoints, jobbin_type]);
+    }, [ltp, actionTab, jobbinPct, jobbinPoints, activeJobbing.type]);
 
     const totalOrderValue = useMemo(() => {
         if (!adjustedPricePerShare || !qtyNum) return 0;
@@ -292,12 +329,32 @@ const OptionStrikeBottomWindow = ({
 
             const activeContextString = localStorage.getItem('activeContext');
             const activeContext = activeContextString ? JSON.parse(activeContextString) : {};
-            const effectiveBrokerId = brokerId || activeContext.brokerId;
-            const effectiveCustomerId = customerId || activeContext.customerId;
+            const globalBrokerId = localStorage.getItem('associatedBrokerStringId');
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlCustomerId = urlParams.get('customerId');
+            const userString = localStorage.getItem('loggedInUser');
+            const userObject = userString ? JSON.parse(userString) : {};
+
+            const effectiveBrokerId = brokerId || activeContext.brokerId || globalBrokerId;
+            const effectiveCustomerId = customerId || activeContext.customerId || urlCustomerId || (userObject.role === 'customer' ? userObject.id : null);
 
             const side = actionTab === 'Buy' ? 'BUY' : 'SELL';
             const product = productType === 'Intraday' ? 'MIS' : 'NRML';
-            const finalPrice = adjustedPricePerShare || ltp;
+
+            // Dynamically calculate matching jobbing price & type for the fresh order price!
+            const orderMatch = advancedRanges.find(r => ltp >= r.start_range && ltp <= r.end_range);
+            const orderJobbingPrice = orderMatch ? String(orderMatch.jobbing_value) : jobbin_price;
+            const orderJobbingType = orderMatch ? orderMatch.jobbing_type : jobbin_type;
+            const orderJobbingPct = orderJobbingType === 'percentage' ? (parseFloat(orderJobbingPrice) || 0) / 100 : 0;
+            const orderJobbingPoints = orderJobbingType === 'points' ? (parseFloat(orderJobbingPrice) || 0) : 0;
+
+            let finalPrice;
+            if (orderJobbingType === 'points') {
+                finalPrice = Number((actionTab === 'Buy' ? (ltp + orderJobbingPoints) : (ltp - orderJobbingPoints)).toFixed(4));
+            } else {
+                const jobbinFactor = actionTab === 'Buy' ? (1 + orderJobbingPct) : (1 - orderJobbingPct);
+                finalPrice = Number((ltp * jobbinFactor).toFixed(4));
+            }
             const token = localStorage.getItem('token') || localStorage.getItem('authToken') || null;
 
             // Normalize Segment for Options
@@ -334,8 +391,8 @@ const OptionStrikeBottomWindow = ({
                 quantity: qtyNum,
                 lots: lotsNum,
                 lot_size: lotSize,
-                jobbin_price: (jobbin_price === '' || jobbin_price === undefined || jobbin_price === null) ? 0 : Number(jobbin_price),
-                jobbin_type: jobbin_type,
+                jobbin_price: (orderJobbingPrice === '' || orderJobbingPrice === undefined || orderJobbingPrice === null) ? 0 : Number(orderJobbingPrice),
+                jobbin_type: orderJobbingType,
                 came_From: 'Open',
                 expire: expiry || undefined,
                 meta: { from: 'ui_option_chain', underlying: underlyingStock?.name, expiry, strike: strikePrice, optionType, selectedStock: pseudoSelectedStock },
@@ -469,12 +526,15 @@ const OptionStrikeBottomWindow = ({
                         {/* MATCHED COMPACT JOBBING (Broker Only) */}
                         {userRole === 'broker' && (
                             <div className="mb-3 bg-[#1e222d] p-3.5 rounded-2xl border border-[#2a2e39]">
-                                <label className="text-[9px] font-black text-[#808a9d] uppercase mb-1 block">Jobbing ({jobbin_type === 'percentage' ? '%' : '₹'})</label>
+                                <label className="text-[9px] font-black text-[#808a9d] uppercase mb-1 block">
+                                    Jobbing ({activeJobbing.type === 'percentage' ? '%' : '₹'}) {isRangeMatched && <span className="text-[8px] text-indigo-400 font-bold ml-1.5 uppercase">(Range Active)</span>}
+                                </label>
                                 <input 
                                     type="number" 
-                                    value={jobbin_price} 
-                                    onChange={(e) => setJobbin_price(e.target.value)} 
-                                    className="bg-transparent text-center text-2xl font-black text-white w-full outline-none" 
+                                    value={activeJobbing.price} 
+                                    onChange={(e) => !isRangeMatched && setJobbin_price(e.target.value)} 
+                                    disabled={isRangeMatched}
+                                    className={`bg-transparent text-center text-2xl font-black w-full outline-none ${isRangeMatched ? 'text-indigo-400 opacity-90' : 'text-white'}`} 
                                 />
                             </div>
                         )}

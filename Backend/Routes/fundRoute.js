@@ -1,7 +1,11 @@
 import express from 'express';
-import { updateNetAvailableBalance, updateNetPnl, getFunds, updateIntradayAvailabeLimit , updateOvernightAvailableLimit, updateIntradayLimitsAll, updateOvernightLimitsAll, updateOptionLimitsAll, updateMcxLimitsAll, updateBrokerMobile, updateOptionLimitPercentage, updateMcxLimitPercentage, getCustomerJobbing, updateCustomerJobbing, updatePaymentDetails, updateWithdrawalLimits, getWithdrawalLimits} from '../Controllers/fundController.js';
+import { updateNetAvailableBalance, updateNetPnl, getFunds, updateIntradayAvailabeLimit , updateOvernightAvailableLimit, updateIntradayLimitsAll, updateOvernightLimitsAll, updateOptionLimitsAll, updateMcxLimitsAll, updateBrokerMobile, updateOptionLimitPercentage, updateMcxLimitPercentage, getCustomerJobbing, updateCustomerJobbing, updatePaymentDetails, updateWithdrawalLimits, getWithdrawalLimits, updateMcxDeposit, updateMcxAvailableLimit, updateMcxOptionLimitPercentage, updateMcxOptionLimitsAll} from '../Controllers/fundController.js';
+import { resolveEffectiveBrokerIdMiddleware } from '../Middleware/resolveEffectiveBrokerId.js';
 
 const router = express.Router();
+
+router.use(resolveEffectiveBrokerIdMiddleware);
+
 
 router.put('/updateNetAvailableBalance', updateNetAvailableBalance);
 router.put('/updateNetPnl', updateNetPnl);
@@ -24,5 +28,10 @@ router.put('/updateCustomerJobbing', updateCustomerJobbing);
 // Withdrawal limits (broker sets per customer)
 router.get('/getWithdrawalLimits', getWithdrawalLimits);
 router.put('/updateWithdrawalLimits', updateWithdrawalLimits);
+
+router.put('/updateMcxDeposit', updateMcxDeposit);
+router.put('/updateMcxAvailableLimit', updateMcxAvailableLimit);
+router.put('/updateMcxOptionLimitPercentage', updateMcxOptionLimitPercentage);
+router.put('/updateMcxOptionLimitsAll', updateMcxOptionLimitsAll);
 
 export default router;

@@ -112,6 +112,11 @@ export default function Profile() {
         icon: Shield, 
         label: "Feature Controls", 
         onClick: () => navigate(`/profile/permissions?customerId=${viewingCustomerId}`) 
+      },
+      { 
+        icon: Settings, 
+        label: "Advance Jobbing", 
+        onClick: () => navigate(`/profile/advance-jobbing?customerId=${viewingCustomerId}`) 
       }
     ] : []),
    

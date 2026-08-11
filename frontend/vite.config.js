@@ -73,12 +73,12 @@ export default defineConfig({
         allowedHosts: ['localhost', '127.0.0.1'],
         proxy: {
             "/api": {
-                target: "https://devaki-backend-rnj5.onrender.com",
+                target: "http://localhost:8080",
                 changeOrigin: true,
-                secure: true,
+                secure: false,
             },
             "/socket.io": {
-                target: "https://devaki-backend-rnj5.onrender.com",
+                target: "http://localhost:8080",
                 changeOrigin: true,
                 ws: true,
             }

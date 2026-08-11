@@ -60,7 +60,7 @@ const OrderSchema = new mongoose.Schema(
     // Open/Closed == UI filter; CLOSED when fully filled/cancelled/rejected
     order_status: {
       type: String,
-      enum: ["OPEN", "CLOSED", "HOLD"],
+      enum: ["OPEN", "CLOSED", "HOLD", "RESTRICTED"],
       default: "OPEN",
       index: true,
     },

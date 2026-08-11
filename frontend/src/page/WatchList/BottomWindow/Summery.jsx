@@ -35,9 +35,22 @@ function Summery({
   brokerId,
   customerId,
 }) {
+  // --- Robust IDs Extraction ---
+  const activeContextString = localStorage.getItem('activeContext');
+  const activeContext = activeContextString ? JSON.parse(activeContextString) : {};
+  const globalBrokerId = localStorage.getItem('associatedBrokerStringId');
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCustomerId = urlParams.get('customerId');
+  const userString = localStorage.getItem('loggedInUser');
+  const userObject = userString ? JSON.parse(userString) : {};
+
+  const effectiveBrokerId = brokerId || activeContext.brokerId || globalBrokerId;
+  const effectiveCustomerId = customerId || activeContext.customerId || urlCustomerId || (userObject.role === 'customer' ? userObject.id : null);
+
   // ---------- local states ----------
   const [jobbin_price, setJobbin_price] = useState("0");
   const [jobbin_type, setJobbin_type] = useState("percentage"); // "percentage" or "points"
+  const [advancedRanges, setAdvancedRanges] = useState([]);
   const [localLotsStr, setLocalLotsStr] = useState('');
   const inputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
@@ -48,15 +61,24 @@ function Summery({
   useEffect(() => {
     const fetchJobbing = async () => {
       try {
-        if (!brokerId || !customerId) return;
+        if (!effectiveBrokerId || !effectiveCustomerId) return;
 
         const apiBase = import.meta.env.VITE_REACT_APP_API_URL || '';
-        const res = await fetch(`${apiBase}/api/funds/getCustomerJobbing?broker_id_str=${brokerId}&customer_id_str=${customerId}`);
+        const res = await fetch(`${apiBase}/api/funds/getCustomerJobbing?broker_id_str=${effectiveBrokerId}&customer_id_str=${effectiveCustomerId}`);
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.jobbing) {
             setJobbin_price(String(data.jobbing.price ?? 0.08));
             setJobbin_type(data.jobbing.type || 'percentage');
+          }
+        }
+
+        // Fetch advanced jobbing
+        const resAdv = await fetch(`${apiBase}/api/advanced-jobbing?broker_id_str=${effectiveBrokerId}&customer_id_str=${effectiveCustomerId}`);
+        if (resAdv.ok) {
+          const dataAdv = await resAdv.json();
+          if (dataAdv.success) {
+            setAdvancedRanges(dataAdv.ranges || []);
           }
         }
       } catch (err) {
@@ -68,7 +90,7 @@ function Summery({
     const handleJobbingUpdate = (e) => {
       try {
         const payload = e.detail;
-        if (payload.customer_id === customerId) {
+        if (payload.customer_id === effectiveCustomerId) {
           if (payload.jobbing) {
             setJobbin_price(String(payload.jobbing.price ?? 0.08));
             setJobbin_type(payload.jobbing.type || 'percentage');
@@ -79,7 +101,7 @@ function Summery({
 
     window.addEventListener('customer_jobbing_updated', handleJobbingUpdate);
     return () => window.removeEventListener('customer_jobbing_updated', handleJobbingUpdate);
-  }, [selectedStock, brokerId, customerId]);
+  }, [effectiveCustomerId, effectiveBrokerId]);
 
   // ---------- FRESH DATA HELPER ----------
   // Gets the latest tick data directly from ticksRef (Kite uses instrument_token)
@@ -167,24 +189,44 @@ function Summery({
     return lotsNum > 0 ? lotsNum * (Number(lotSize) || 1) : 0;
   }, [lotsNum, lotSize]);
 
+  const baseLtp = ltpRaw ?? bestAskRaw ?? bestBidRaw ?? 0;
+
+  const activeJobbing = useMemo(() => {
+    const ltpVal = baseLtp || 0;
+    const match = advancedRanges.find(r => ltpVal >= r.start_range && ltpVal <= r.end_range);
+    if (match) {
+      return {
+        price: String(match.jobbing_value),
+        type: match.jobbing_type
+      };
+    }
+    return {
+      price: jobbin_price,
+      type: jobbin_type
+    };
+  }, [baseLtp, advancedRanges, jobbin_price, jobbin_type]);
+
+  const isRangeMatched = useMemo(() => {
+    const ltpVal = baseLtp || 0;
+    return advancedRanges.some(r => ltpVal >= r.start_range && ltpVal <= r.end_range);
+  }, [baseLtp, advancedRanges]);
+
   const jobbinPct = useMemo(() => {
-    if (jobbin_type === 'points') return 0; // not used in points mode
-    const v = parseFloat(String(jobbin_price).trim());
+    if (activeJobbing.type === 'points') return 0; // not used in points mode
+    const v = parseFloat(String(activeJobbing.price).trim());
     return Number.isFinite(v) ? v / 100 : 0;
-  }, [jobbin_price, jobbin_type]);
+  }, [activeJobbing]);
 
   const jobbinPoints = useMemo(() => {
-    if (jobbin_type !== 'points') return 0;
-    const v = parseFloat(String(jobbin_price).trim());
+    if (activeJobbing.type !== 'points') return 0;
+    const v = parseFloat(String(activeJobbing.price).trim());
     return Number.isFinite(v) ? v : 0;
-  }, [jobbin_price, jobbin_type]);
-
-  const baseLtp = ltpRaw ?? bestAskRaw ?? bestBidRaw ?? 0;
+  }, [activeJobbing]);
 
   const { adjustedPricePerShareRaw, adjustedPricePerShare } = useMemo(() => {
     if (!baseLtp) return { adjustedPricePerShareRaw: 0, adjustedPricePerShare: 0 };
     let pxRaw;
-    if (jobbin_type === 'points') {
+    if (activeJobbing.type === 'points') {
       // Points mode: directly add/subtract the fixed amount
       pxRaw = actionTab === 'Buy' ? (baseLtp + jobbinPoints) : (baseLtp - jobbinPoints);
     } else {
@@ -193,7 +235,7 @@ function Summery({
       pxRaw = baseLtp * perShareFactor;
     }
     return { adjustedPricePerShareRaw: pxRaw, adjustedPricePerShare: Number(pxRaw.toFixed(4)) };
-  }, [baseLtp, actionTab, jobbinPct, jobbinPoints, jobbin_type]);
+  }, [baseLtp, actionTab, jobbinPct, jobbinPoints, activeJobbing.type]);
 
   const totalOrderValue = useMemo(() => {
     if (!adjustedPricePerShare || !qtyNum) return 0;
@@ -271,11 +313,17 @@ function Summery({
     const qty = Number(lots) * Number(lot_size);
 
     // Calculate final price with jobbin adjustment using FRESH price
+    const orderMatch = advancedRanges.find(r => priceForOrder >= r.start_range && priceForOrder <= r.end_range);
+    const orderJobbingPrice = orderMatch ? String(orderMatch.jobbing_value) : jobbin_price;
+    const orderJobbingType = orderMatch ? orderMatch.jobbing_type : jobbin_type;
+    const orderJobbingPct = orderJobbingType === 'percentage' ? (parseFloat(orderJobbingPrice) || 0) / 100 : 0;
+    const orderJobbingPoints = orderJobbingType === 'points' ? (parseFloat(orderJobbingPrice) || 0) : 0;
+
     let finalPrice;
-    if (jobbin_type === 'points') {
-      finalPrice = Number((isBuy ? (priceForOrder + jobbinPoints) : (priceForOrder - jobbinPoints)).toFixed(4));
+    if (orderJobbingType === 'points') {
+      finalPrice = Number((isBuy ? (priceForOrder + orderJobbingPoints) : (priceForOrder - orderJobbingPoints)).toFixed(4));
     } else {
-      const jobbinFactor = isBuy ? (1 + jobbinPct) : (1 - jobbinPct);
+      const jobbinFactor = isBuy ? (1 + orderJobbingPct) : (1 - orderJobbingPct);
       finalPrice = Number((priceForOrder * jobbinFactor).toFixed(4));
     }
     const calculatedOrderValue = Number((finalPrice * qty).toFixed(2));
@@ -329,8 +377,8 @@ function Summery({
 
     // *** 3. PROCEED TO PLACE ORDER (If Funds OK) ***
     const payload = {
-      broker_id_str: brokerId,
-      customer_id_str: customerId,
+      broker_id_str: effectiveBrokerId,
+      customer_id_str: effectiveCustomerId,
       instrument_token: selectedStock?.instrument_token || '',
       symbol: selectedStock?.tradingSymbol || '',
       segment: selectedStock?.segment || '',
@@ -340,8 +388,8 @@ function Summery({
       quantity: qty,
       lots: Number(lots),
       lot_size: Number(lot_size),
-      jobbin_price: jobbin_price,
-      jobbin_type: jobbin_type,
+      jobbin_price: (orderJobbingPrice === '' || orderJobbingPrice === undefined || orderJobbingPrice === null) ? 0 : Number(orderJobbingPrice),
+      jobbin_type: orderJobbingType,
       expire: selectedStock?.expiry || new Date().toLocaleString('en-IN'),
       meta: { from: 'ui_watchlist_summery', selectedStock }
     };
@@ -379,9 +427,6 @@ function Summery({
       setSubmitting(false);
     }
   };
-
-  const userString = localStorage.getItem('loggedInUser');
-  const userObject = userString ? JSON.parse(userString) : {};
   const userRole = userObject.role;
 
   // Use an input key so React will remount the input only when selectedStock changes.
@@ -453,8 +498,16 @@ function Summery({
         {/* Compact Jobbing */}
         {userRole === 'broker' && (
           <div className="mb-3 bg-[#1e222d] p-3.5 rounded-2xl border border-[#2a2e39]">
-            <label className="text-[9px] font-black text-[#808a9d] uppercase mb-1 block">Jobbing ({jobbin_type === 'percentage' ? '%' : '₹'})</label>
-            <input type="number" value={jobbin_price} onChange={(e) => setJobbin_price(e.target.value)} className="bg-transparent text-center text-2xl font-black text-white w-full outline-none" />
+            <label className="text-[9px] font-black text-[#808a9d] uppercase mb-1 block">
+              Jobbing ({activeJobbing.type === 'percentage' ? '%' : '₹'}) {isRangeMatched && <span className="text-[8px] text-indigo-400 font-bold ml-1.5 uppercase">(Range Active)</span>}
+            </label>
+            <input 
+              type="number" 
+              value={activeJobbing.price} 
+              onChange={(e) => !isRangeMatched && setJobbin_price(e.target.value)} 
+              disabled={isRangeMatched}
+              className={`bg-transparent text-center text-2xl font-black w-full outline-none ${isRangeMatched ? 'text-indigo-400 opacity-90' : 'text-white'}`} 
+            />
           </div>
         )}
 

@@ -123,6 +123,31 @@ const fundSchema = new mongoose.Schema({
         holder_name: { type: String },
         account_number: { type: String },
         qr_code: { type: String } // Base64 or Image URL
+    },
+
+    // Standalone MCX deposit value
+    mcx_deposit: {
+        type: Number,
+        default: 0.00
+    },
+
+    // MCX Option Limit Tracking (Segregated from regular options)
+    mcx_option_limit: {
+        available_limit: { type: Number, default: 0.00 },
+        used_limit: { type: Number, default: 0.00 },
+        free_limit: { type: Number, default: 0.00 },
+        intraday: {
+            used_today: { type: Number, default: 0.00 },
+            last_trade_date: { type: Date }
+        },
+        overnight: {
+            used_today: { type: Number, default: 0.00 },
+            last_trade_date: { type: Date }
+        }
+    },
+    mcx_option_limit_percentage: {
+        type: Number,
+        default: 10
     }
 
 }, {

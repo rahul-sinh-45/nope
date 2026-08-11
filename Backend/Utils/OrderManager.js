@@ -19,9 +19,9 @@ export const loadOpenOrders = async () => {
     try {
         console.log("🔄 [OrderManager] Loading active triggers...");
 
-        // LOGIC: Status 'CLOSED' nahi hona chahiye + SL ya Target set hona chahiye
+        // LOGIC: Status 'CLOSED' aur 'RESTRICTED' nahi hona chahiye + SL ya Target set hona chahiye
         const activeOrders = await Order.find({
-            order_status: { $ne: 'CLOSED' }, // Means: OPEN, HOLD, or null
+            order_status: { $nin: ['CLOSED', 'RESTRICTED'] }, // Means: OPEN, HOLD, or null
             $or: [
                 { stop_loss: { $exists: true, $ne: null, $gt: 0 } },
                 { target: { $exists: true, $ne: null, $gt: 0 } }
@@ -105,8 +105,8 @@ export const updateTriggerInWatchlist = (order) => {
         }
     }
 
-    // Step 2: Agar abhi bhi CLOSED nahi hai, to wapas add karo
-    if (order.order_status !== 'CLOSED') {
+    // Step 2: Agar abhi bhi CLOSED aur RESTRICTED nahi hai, to wapas add karo
+    if (order.order_status !== 'CLOSED' && order.order_status !== 'RESTRICTED') {
         addToWatchlist(order);
     }
 };
@@ -168,7 +168,7 @@ const executeExit = async (orderData, exitPrice, reason) => {
                 if (isIntraday) incQuery["intraday.used_limit"] = -marginToRelease;
                 else incQuery["overnight.available_limit"] = marginToRelease;
             }
-            if (pnl !== 0) incQuery["net_pnl"] = pnl;
+            // if (pnl !== 0) incQuery["net_pnl"] = pnl;
 
             await Fund.updateOne(
                 { broker_id_str, customer_id_str },

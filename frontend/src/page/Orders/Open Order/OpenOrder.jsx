@@ -88,6 +88,36 @@ export default function OpenOrder({ filter }) {
     }
   };
 
+  const handleRestrictOrder = async (data) => {
+    if (isProcessingId) return;
+    setIsProcessingId(data._id);
+    try {
+      const payload = {
+        broker_id_str: brokerId,
+        customer_id_str: customerId,
+        order_id: data._id,
+        order_status: "RESTRICTED",
+        came_From: "Open",
+        closed_at: new Date().toISOString()
+      };
+
+      const res = await fetch(`${apiBase.replace(/\/$/, "")}/api/orders/updateOrder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('orders:changed'));
+        fetchInstrumentData();
+      }
+    } catch (err) {
+      console.error("Restriction failed", err);
+    } finally {
+      setIsProcessingId(null);
+    }
+  };
+
   // ---------- 1) FETCH ORDERS ----------
   const fetchInstrumentData = async () => {
     setLoader(true);
@@ -567,25 +597,63 @@ export default function OpenOrder({ filter }) {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
-                <LockedButtonWrapper featureId="modify_order" className="flex-1">
-                  <button
-                    onClick={() => handleOrderSelect(data)}
-                    className="w-full py-3.5 bg-[#3b82f6] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all  "
-                  >
-                    Modify
-                  </button>
-                </LockedButtonWrapper>
+              <div className="flex flex-col justify-between gap-2 w-full">
+                {userRole === 'broker' ? (
+                  <>
+                    {/* Row 1: Modify & Restrict */}
+                    <div className="flex gap-5 w-full">
+                      <LockedButtonWrapper featureId="modify_order" className="flex-1">
+                        <button
+                          onClick={() => handleOrderSelect(data)}
+                          className="w-full py-3.5 bg-[#3b82f6] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all"
+                        >
+                          Modify
+                        </button>
+                      </LockedButtonWrapper>
 
-                <LockedButtonWrapper featureId="cancel_order" className="flex-1">
-                  <button
-                    onClick={() => handleSingleExit(data)}
-                    disabled={isProcessingId === data._id}
-                    className={`w-full py-3.5 bg-[#f23645] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all  ${isProcessingId === data._id ? 'opacity-50' : ''}`}
-                  >
-                    {isProcessingId === data._id ? 'Exiting...' : 'Exit'}
-                  </button>
-                </LockedButtonWrapper>
+                      <button
+                        onClick={() => handleRestrictOrder(data)}
+                        disabled={isProcessingId === data._id}
+                        className={`flex-1 py-3.5 px-7 bg-amber-500 text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all ${isProcessingId === data._id ? 'opacity-50' : ''}`}
+                      >
+                        Restrict
+                      </button>
+                    </div>
+
+                    {/* Row 2: Exit */}
+                    <LockedButtonWrapper featureId="cancel_order" className="w-full">
+                      <button
+                        onClick={() => handleSingleExit(data)}
+                        disabled={isProcessingId === data._id}
+                        className={`w-full py-3.5 bg-[#f23645] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all ${isProcessingId === data._id ? 'opacity-50' : ''}`}
+                      >
+                        {isProcessingId === data._id ? 'Exiting...' : 'Exit'}
+                      </button>
+                    </LockedButtonWrapper>
+                  </>
+                ) : (
+                  /* Customer: Modify & Exit in one row */
+                  <div className="flex gap-2 w-full">
+                    <LockedButtonWrapper featureId="modify_order" className="flex-1">
+                      <button
+                        onClick={() => handleOrderSelect(data)}
+                        className="w-full py-3.5 bg-[#3b82f6] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all"
+                      >
+                        Modify
+                      </button>
+                    </LockedButtonWrapper>
+
+                    <LockedButtonWrapper featureId="cancel_order" className="flex-1">
+                      <button
+                        onClick={() => handleSingleExit(data)}
+                        disabled={isProcessingId === data._id}
+                        className={`w-full py-3.5 bg-[#f23645] text-white text-[11px] font-black uppercase tracking-[2px] rounded-2xl hover:brightness-110 active:scale-[0.98] transition-all ${isProcessingId === data._id ? 'opacity-50' : ''}`}
+                      >
+                        {isProcessingId === data._id ? 'Exiting...' : 'Exit'}
+                      </button>
+                    </LockedButtonWrapper>
+                  </div>
+                )}
               </div>
             </li>
           );

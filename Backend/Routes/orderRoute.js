@@ -2,8 +2,12 @@ import { getOrderInstrument, postOrder, updateOrder, exitAllOpenOrder, deleteOrd
 import express from "express";
 import { validateRequest } from '../Middleware/validateRequest.js';
 import { orderPlacementSchema, orderUpdateSchema } from '../Utils/schemas.js';
+import { resolveEffectiveBrokerIdMiddleware } from '../Middleware/resolveEffectiveBrokerId.js';
 
 const router = express.Router();
+
+router.use(resolveEffectiveBrokerIdMiddleware);
+
 
 router.post('/postOrder', validateRequest(orderPlacementSchema), postOrder);
 router.get('/getOrderInstrument', getOrderInstrument);

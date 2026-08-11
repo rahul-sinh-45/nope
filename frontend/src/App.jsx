@@ -22,6 +22,7 @@ const ChartPage = lazy(() => import('./page/Chart/ChartPage.jsx'));
 const AddFundsPage = lazy(() => import('./page/Funds/AddFundsPage.jsx'));
 const WithdrawFundsPage = lazy(() => import('./page/Funds/WithdrawFundsPage.jsx'));
 const FundRequestsPage = lazy(() => import('./page/Funds/FundRequestsPage.jsx'));
+const McxFundPage = lazy(() => import('./page/Funds/McxFundView.jsx'));
 
 // === ADMIN/RARE PAGES - LAZY LOAD (load on demand) ===
 const BrockerDetailPage = lazy(() => import('./page/User/BrockerDetailPage.jsx'));
@@ -33,6 +34,7 @@ const AdminAccessToken = lazy(() => import('./page/Admin/AdminAccessToken.jsx'))
 const AdminTOTP = lazy(() => import('./page/Admin/AdminTOTP.jsx'));
 const AdminLogs = lazy(() => import('./page/Admin/AdminLogs.jsx'));
 const CustomerPermissions = lazy(() => import('./page/Profile/CustomerPermissions.jsx'));
+const AdvanceJobbingPage = lazy(() => import('./page/Profile/AdvanceJobbingView.jsx'));
 
 import { MarketDataProvider } from './contexts/MarketDataContext.jsx';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
@@ -137,6 +139,15 @@ function App() {
                             />
 
                             <Route
+                                path="/funds/mcx"
+                                element={
+                                    <Layout>
+                                        <McxFundPage />
+                                    </Layout>
+                                }
+                            />
+
+                            <Route
                                 path="/funds/add"
                                 element={
                                     <Layout>
@@ -181,11 +192,20 @@ function App() {
                                 }
                             />
 
-                            <Route
+                             <Route
                                 path="/profile/permissions"
                                 element={
                                     <Layout>
                                         <CustomerPermissions />
+                                    </Layout>
+                                }
+                            />
+
+                            <Route
+                                path="/profile/advance-jobbing"
+                                element={
+                                    <Layout>
+                                        <AdvanceJobbingPage />
                                     </Layout>
                                 }
                             />

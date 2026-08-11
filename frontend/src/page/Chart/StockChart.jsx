@@ -28,6 +28,7 @@ function StockChart({
   const [error, setError] = useState(null);
   const [selectedInterval, setSelectedInterval] = useState(initialInterval || '5');
   const [dateRange, setDateRange] = useState({ from: initialFrom || '', to: initialTo || '' });
+  const [chartType, setChartType] = useState('candle'); // 'candle' | 'line'
   const [isInitialized, setIsInitialized] = useState(false);
   const [liveConnectionStatus, setLiveConnectionStatus] = useState('disconnected');
 
@@ -289,6 +290,19 @@ function StockChart({
           </select>
         </div>
 
+        {/* Chart Type Dropdown */}
+        <div className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded-lg px-2 py-1 shrink-0">
+          <span className="text-xs text-[var(--text-secondary)] font-semibold">Type:</span>
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value)}
+            className="bg-transparent text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer appearance-none outline-none"
+          >
+            <option value="candle" className="bg-[var(--bg-card)] text-[var(--text-primary)]">Candles</option>
+            <option value="line" className="bg-[var(--bg-card)] text-[var(--text-primary)]">Line</option>
+          </select>
+        </div>
+
         {/* Date Range Picker */}
         <div className="flex items-center gap-1.5 bg-[var(--bg-primary)] rounded-lg px-2 py-1 shrink-0">
           <Calendar className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
@@ -376,6 +390,7 @@ function StockChart({
             candles={candles}
             symbol={displayName}
             interval={selectedInterval}
+            chartType={chartType}
             isLiveEnabled={currentInterval.type === 'intraday' && liveConnectionStatus === 'connected'}
             loading={loading}
           />

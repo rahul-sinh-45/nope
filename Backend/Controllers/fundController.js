@@ -71,6 +71,38 @@ const resetMcxUsageForFunds = async (fund) => {
     }
 };
 
+const resetMcxOptionUsageForFunds = async (fund) => {
+    if (!fund || !fund.mcx_option_limit) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let modified = false;
+
+    for (const typeKey of ['intraday', 'overnight']) {
+        const tracker = fund.mcx_option_limit?.[typeKey];
+        if (!tracker) continue;
+
+        let lastDate = tracker.last_trade_date ? new Date(tracker.last_trade_date) : null;
+        if (lastDate) lastDate.setHours(0, 0, 0, 0);
+
+        if (!lastDate || lastDate.getTime() !== today.getTime()) {
+            tracker.used_today = 0;
+            tracker.last_trade_date = new Date();
+            modified = true;
+        }
+    }
+
+    if (modified) {
+        const totalUsed = (fund.mcx_option_limit.intraday?.used_today || 0) + (fund.mcx_option_limit.overnight?.used_today || 0);
+        if (fund.mcx_option_limit.available_limit !== undefined) {
+            fund.mcx_option_limit.used_limit = totalUsed;
+            fund.mcx_option_limit.free_limit = Math.max(0, (fund.mcx_option_limit.available_limit || 0) - totalUsed);
+        }
+        fund.markModified('mcx_option_limit');
+        await fund.save();
+    }
+};
+
 const updateNetAvailableBalance = async (req, res) => {
     const { broker_id_str, customer_id_str, new_balance } = req.body;
 
@@ -168,6 +200,7 @@ const getFunds = asyncHandler(async (req, res) => {
         // Reset option and MCX usage if it's a new trading day (keeps UI in sync)
         await resetOptionUsageForFunds(fund);
         await resetMcxUsageForFunds(fund);
+        await resetMcxOptionUsageForFunds(fund);
     }
 
     // 5. Response bhejein
@@ -579,4 +612,91 @@ const getWithdrawalLimits = asyncHandler(async (req, res) => {
     });
 });
 
-export { getFunds, updateNetAvailableBalance, updateNetPnl, updateIntradayLimit, updateIntradayAvailabeLimit, updateOvernightAvailableLimit, updateIntradayLimitsAll, updateOvernightLimitsAll, updateOptionLimitsAll, updateMcxLimitsAll, updateBrokerMobile, updateOptionLimitPercentage, updateMcxLimitPercentage, getCustomerJobbing, updateCustomerJobbing, updatePaymentDetails, updateWithdrawalLimits, getWithdrawalLimits };
+const updateMcxDeposit = asyncHandler(async (req, res) => {
+    const { broker_id_str, customer_id_str, new_deposit } = req.body;
+
+    if (new_deposit === undefined) {
+        res.status(400);
+        throw new Error("New deposit is required");
+    }
+
+    const updatedFund = await Fund.findOneAndUpdate(
+        { broker_id_str, customer_id_str },
+        { 
+            $set: { 
+                mcx_deposit: Number(new_deposit)
+            } 
+        },
+        { new: true, upsert: true }
+    );
+
+    res.status(200).json({ success: true, data: updatedFund });
+});
+
+const updateMcxAvailableLimit = asyncHandler(async (req, res) => {
+    const { broker_id_str, customer_id_str, new_limit } = req.body;
+
+    if (new_limit === undefined) {
+        res.status(400);
+        throw new Error("New limit is required");
+    }
+
+    const fund = await Fund.findOne({ broker_id_str, customer_id_str });
+    const used = fund?.mcx_limit?.used_limit || 0;
+
+    const updatedFund = await Fund.findOneAndUpdate(
+        { broker_id_str, customer_id_str },
+        { 
+            $set: { 
+                "mcx_limit.available_limit": Number(new_limit),
+                "mcx_limit.free_limit": Math.max(0, Number(new_limit) - used)
+            } 
+        },
+        { new: true, upsert: true }
+    );
+
+    res.status(200).json({ success: true, data: updatedFund });
+});
+
+const updateMcxOptionLimitPercentage = asyncHandler(async (req, res) => {
+    const { broker_id_str, customer_id_str, percentage } = req.body;
+
+    if (percentage === undefined) {
+        res.status(400);
+        throw new Error("Percentage is required");
+    }
+
+    const updatedFund = await Fund.findOneAndUpdate(
+        { broker_id_str, customer_id_str },
+        { $set: { mcx_option_limit_percentage: Number(percentage) } },
+        { new: true, upsert: true }
+    );
+
+    res.status(200).json({ success: true, data: updatedFund });
+});
+
+const updateMcxOptionLimitsAll = asyncHandler(async (req, res) => {
+    const { broker_id_str, customer_id_str, available_limit, free_limit, used_limit } = req.body;
+
+    const effectiveUsed = used_limit !== undefined ? Number(used_limit) : 0;
+
+    const updatedFund = await Fund.findOneAndUpdate(
+        { broker_id_str, customer_id_str },
+        { 
+            $set: { 
+                "mcx_option_limit.available_limit": available_limit !== undefined ? Number(available_limit) : 0,
+                "mcx_option_limit.free_limit": free_limit !== undefined ? Number(free_limit) : 0,
+                "mcx_option_limit.used_limit": effectiveUsed,
+                "mcx_option_limit.intraday.used_today": effectiveUsed,
+                "mcx_option_limit.intraday.last_trade_date": new Date(),
+                "mcx_option_limit.overnight.used_today": 0,
+                "mcx_option_limit.overnight.last_trade_date": new Date()
+            } 
+        },
+        { new: true, upsert: true }
+    );
+
+    res.status(200).json({ success: true, data: updatedFund });
+});
+
+export { getFunds, updateNetAvailableBalance, updateNetPnl, updateIntradayLimit, updateIntradayAvailabeLimit, updateOvernightAvailableLimit, updateIntradayLimitsAll, updateOvernightLimitsAll, updateOptionLimitsAll, updateMcxLimitsAll, updateBrokerMobile, updateOptionLimitPercentage, updateMcxLimitPercentage, getCustomerJobbing, updateCustomerJobbing, updatePaymentDetails, updateWithdrawalLimits, getWithdrawalLimits, updateMcxDeposit, updateMcxAvailableLimit, updateMcxOptionLimitPercentage, updateMcxOptionLimitsAll };
