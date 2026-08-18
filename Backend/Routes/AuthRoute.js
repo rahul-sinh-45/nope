@@ -13,7 +13,8 @@ import {
   permanentDeleteCustomer,
   uploadProfilePhoto,
   getCustomerDetails,
-  updateBrokerJobbing
+  updateBrokerJobbing,
+  toggleBanCustomer
 } from '../Controllers/CustomerController.js';
 // IMPORTANT: JWT verification ke liye
 import { protect } from '../Middleware/authMiddleware.js';
@@ -51,6 +52,7 @@ router.get('/verify', protect, (req, res) => {
 router.post('/addCustomer', protect, addCustomer); 
 router.get('/getCustomers', protect, getBrokerCustomers);
 router.delete('/deleteCustomer/:id', protect, deleteCustomer);
+router.post('/toggle-ban-customer/:id', protect, toggleBanCustomer);
 
 // --- CUSTOMER PROFILE ROUTES ---
 router.get('/customer/:customerId', protect, getCustomerDetails);

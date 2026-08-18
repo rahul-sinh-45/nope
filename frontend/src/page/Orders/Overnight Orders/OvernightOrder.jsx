@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { MOCK_ORDERS } from "../mockData";
 import { useMarketData } from "../../../contexts/MarketDataContext.jsx";
 import OvernightOrderBottomWindow from "./OvernightOrderBottomWindow.jsx";
-import { calculatePnLAndBrokerage } from "../../../Utils/calculateBrokerage.jsx";
+import { calculatePnLAndBrokerage, formatTradingSymbol } from "../../../Utils/calculateBrokerage.jsx";
 
 const money = (n) => `₹${Number(n ?? 0).toFixed(2)}`;
 
@@ -453,7 +453,7 @@ export default function OvernightOrder({ filter }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="text-[var(--text-primary)] font-black text-sm uppercase tracking-tight truncate">
-                      {tradingsymbol || "—"}
+                      {formatTradingSymbol(tradingsymbol) || "—"}
                     </h4>
                     <span className="text-[8px] font-black text-[var(--text-muted)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded uppercase">
                       {data.segment || "NFO"}

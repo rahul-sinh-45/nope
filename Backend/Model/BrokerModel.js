@@ -48,6 +48,10 @@ const BrokerSchema = new Schema({
     default_jobbing_type: {
         type: String,
         default: 'percentage'
+    },
+    is_banned: {
+        type: Boolean,
+        default: false
     }
 });
 

@@ -3,6 +3,7 @@ import { X, RefreshCw, AlertCircle, Loader, TrendingDown, ChevronDown } from 'lu
 import { useOptionChain } from '../../../hooks/useOptionChain';
 import OptionStrikeBottomWindow from './OptionStrikeBottomWindow';
 import StockChart from '../../Chart/StockChart';
+import LockedButtonWrapper from '../../../components/LockedButtonWrapper';
 
 // Strike count options
 const STRIKE_OPTIONS = [
@@ -61,7 +62,7 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
         segment: chainSegment,
         refetch
     } = useOptionChain({
-        name: selectedStock?.name,
+        name: selectedStock?.tradingSymbol || selectedStock?.name,
         segment: selectedStock?.segment,
         expiry: selectedExpiry
     });
@@ -295,34 +296,38 @@ const OptionChainFullscreen = ({ selectedStock, sheetData, onClose, brokerId, cu
                         </>
                     ) : (
                         <>
-                            <button
-                                onClick={() => setSelectedStrike({
-                                    strike: null,
-                                    type: 'CE',
-                                    instrumentToken: selectedStock.instrument_token,
-                                    tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
-                                    lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
-                                    expiry: selectedStock.expiry,
-                                    initialActionTab: 'Buy'
-                                })}
-                                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
-                            >
-                                BUY
-                            </button>
-                            <button
-                                onClick={() => setSelectedStrike({
-                                    strike: null,
-                                    type: 'PE',
-                                    instrumentToken: selectedStock.instrument_token,
-                                    tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
-                                    lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
-                                    expiry: selectedStock.expiry,
-                                    initialActionTab: 'Sell'
-                                })}
-                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-all text-center"
-                            >
-                                SELL
-                            </button>
+                            <LockedButtonWrapper featureId="buy" className="flex-1">
+                                <button
+                                    onClick={() => setSelectedStrike({
+                                        strike: null,
+                                        type: 'CE',
+                                        instrumentToken: selectedStock.instrument_token,
+                                        tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
+                                        lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
+                                        expiry: selectedStock.expiry,
+                                        initialActionTab: 'Buy'
+                                    })}
+                                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
+                                >
+                                    BUY
+                                </button>
+                            </LockedButtonWrapper>
+                            <LockedButtonWrapper featureId="sell" className="flex-1">
+                                <button
+                                    onClick={() => setSelectedStrike({
+                                        strike: null,
+                                        type: 'PE',
+                                        instrumentToken: selectedStock.instrument_token,
+                                        tradingSymbol: selectedStock.tradingSymbol || selectedStock.name,
+                                        lot_size: selectedStock.lot_size || selectedStock.lotSize || 1,
+                                        expiry: selectedStock.expiry,
+                                        initialActionTab: 'Sell'
+                                    })}
+                                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/20 active:scale-95 transition-all text-center"
+                                >
+                                    SELL
+                                </button>
+                            </LockedButtonWrapper>
                         </>
                     )}
                 </div>

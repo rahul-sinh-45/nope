@@ -35,6 +35,7 @@ const AdminTOTP = lazy(() => import('./page/Admin/AdminTOTP.jsx'));
 const AdminLogs = lazy(() => import('./page/Admin/AdminLogs.jsx'));
 const CustomerPermissions = lazy(() => import('./page/Profile/CustomerPermissions.jsx'));
 const AdvanceJobbingPage = lazy(() => import('./page/Profile/AdvanceJobbingView.jsx'));
+const AddClosedOrder = lazy(() => import('./page/Orders/AddClosedOrder.jsx'));
 
 import { MarketDataProvider } from './contexts/MarketDataContext.jsx';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
@@ -179,6 +180,15 @@ function App() {
                                 element={
                                     <Layout>
                                         <Orders />
+                                    </Layout>
+                                }
+                            />
+
+                            <Route
+                                path="/orders/add-closed-order"
+                                element={
+                                    <Layout>
+                                        <AddClosedOrder />
                                     </Layout>
                                 }
                             />

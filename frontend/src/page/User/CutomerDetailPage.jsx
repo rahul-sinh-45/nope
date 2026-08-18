@@ -131,6 +131,31 @@ export default function CustomerDetailsPage() {
   const handleCustomerAdded = (c) => setCustomers((prev) => [c, ...prev]);
   const handleCustomerDeleted = (id) => setCustomers((prev) => prev.filter((c) => c.id !== id));
 
+  const handleToggleBanCustomer = async (customer) => {
+    const token = localStorage.getItem('authToken');
+    const url = API_URL;
+    try {
+      const response = await axios.post(
+        `${url}/api/auth/toggle-ban-customer/${customer.id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setCustomers(prev => prev.map(c => {
+          if (c.id === customer.id) {
+            return { ...c, status: response.data.is_banned ? 'Banned' : 'Active' };
+          }
+          return c;
+        }));
+      } else {
+        alert(response.data.message || 'Failed to update ban status.');
+      }
+    } catch (error) {
+      console.error('Toggle customer ban error:', error);
+      alert('Error updating ban status.');
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (!token) { window.location.href = '/'; return; }
@@ -240,6 +265,13 @@ export default function CustomerDetailsPage() {
               >
                 Edit
               </Link>
+              <button
+                onClick={() => handleToggleBanCustomer(c)}
+                className={`rounded-md px-4 py-1 text-sm font-medium text-white transition ${c.status === 'Banned' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                type="button"
+              >
+                {c.status === 'Banned' ? 'Unban' : 'Ban'}
+              </button>
               <button
                 onClick={() => setDeleteTarget(c)}
                 className="rounded-md bg-red-600 px-4 py-1 text-sm font-medium text-white hover:bg-red-700"

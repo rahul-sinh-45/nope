@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Download, Printer, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { calculateExitBrokerageAndPnL } from '../../Utils/calculateBrokerage';
+import { calculateExitBrokerageAndPnL, formatTradingSymbol } from '../../Utils/calculateBrokerage';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { API_URL } from '../../config';
@@ -387,7 +387,7 @@ export default function Invoice() {
                             {invoiceData.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-[#f9fafb]">
                                     <td className="px-4 py-3 text-[#6b7280]">{item.date}</td>
-                                    <td className="px-4 py-3 font-medium text-[#111827] break-words whitespace-normal max-w-[150px]">{item.symbol}</td>
+                                    <td className="px-4 py-3 font-medium text-[#111827] break-words whitespace-normal max-w-[150px]">{formatTradingSymbol(item.symbol)}</td>
 
                                     <td className="px-4 py-3 text-right text-[#374151]">{item.qty}</td>
                                     <td className="px-4 py-3 text-right text-[#374151]">{item.entryPrice.toFixed(2)}</td>

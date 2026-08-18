@@ -25,7 +25,7 @@ const OptionChainView = ({ selectedStock, sheetData }) => {
         error,
         refetch
     } = useOptionChain({
-        name: selectedStock?.name,
+        name: selectedStock?.tradingSymbol || selectedStock?.name,
         segment: selectedStock?.segment,
         expiry: selectedExpiry
     });

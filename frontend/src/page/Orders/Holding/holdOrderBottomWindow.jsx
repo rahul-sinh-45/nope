@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, DollarSign, Hash, Zap, XCircle, Clock, Target, AlertCircle, ChevronDown, Plus, Minus, Pencil, Check } from 'lucide-react';
 import { getFundsData } from '../../../Utils/fetchFund.jsx';
 import { logMarketStatus } from '../../../Utils/marketStatus.js';
-import { calculatePnLAndBrokerage } from '../../../Utils/calculateBrokerage.jsx';
+import { calculatePnLAndBrokerage, formatTradingSymbol } from '../../../Utils/calculateBrokerage.jsx';
 
 const money = (n) => `₹${Number(n ?? 0).toFixed(2)}`;
 
@@ -118,7 +118,11 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
     // --- Jobbing Point State ---
     const [jobbingPointInput, setJobbingPointInput] = useState(selectedOrder.jobbing_point || '');
     const [savedJobbingPoint, setSavedJobbingPoint] = useState(selectedOrder.jobbing_point || 0);
+    const [jobbingAppliedLtpState, setJobbingAppliedLtpState] = useState(selectedOrder.jobbing_applied_ltp || 0);
+    const [customerExitPriceInput, setCustomerExitPriceInput] = useState(selectedOrder.customer_exit_price || '');
+    const [savedCustomerExitPrice, setSavedCustomerExitPrice] = useState(selectedOrder.customer_exit_price || 0);
     const [savingJP, setSavingJP] = useState(false);
+    const [savingCEP, setSavingCEP] = useState(false);
 
     const apiBase = import.meta.env.VITE_REACT_APP_API_URL || "";
     const token = localStorage.getItem("token") || null;
@@ -135,6 +139,9 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
         // Initial set from prop
         setJobbingPointInput(selectedOrder.jobbing_point || '');
         setSavedJobbingPoint(selectedOrder.jobbing_point || 0);
+        setJobbingAppliedLtpState(selectedOrder.jobbing_applied_ltp || 0);
+        setCustomerExitPriceInput(selectedOrder.customer_exit_price || '');
+        setSavedCustomerExitPrice(selectedOrder.customer_exit_price || 0);
 
         setFeedback(null);
         setAction('Adjust');
@@ -152,6 +159,9 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
                     if (freshOrder) {
                         setJobbingPointInput(freshOrder.jobbing_point || '');
                         setSavedJobbingPoint(freshOrder.jobbing_point || 0);
+                        setJobbingAppliedLtpState(freshOrder.jobbing_applied_ltp || 0);
+                        setCustomerExitPriceInput(freshOrder.customer_exit_price || '');
+                        setSavedCustomerExitPrice(freshOrder.customer_exit_price || 0);
                         setSlPrice(freshOrder.stop_loss || '');
                         setTargetPrice(freshOrder.target || '');
                     }
@@ -287,15 +297,21 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
                 const jobbingRaw = Number(selectedOrder.increase_price || 0);
                 const jobbingType = selectedOrder.jobbin_type || 'percentage';
 
-                let closedLtp = liveLtp || currentPrice || initialPrice || 0;
+                let closedLtp;
+                if (Number(savedCustomerExitPrice) > 0) {
+                    closedLtp = Number(savedCustomerExitPrice);
+                } else {
+                    const refLtp = Number(jobbingAppliedLtpState || 0) || liveLtp || currentPrice || initialPrice || 0;
+                    closedLtp = refLtp;
 
-                // (REMOVED Entry-Side Jobbing % from Exit)
+                    // (REMOVED Entry-Side Jobbing % from Exit)
 
-                // --- Apply Jobbing Point (separate exit-time deduction) ---
-                const jpValue = Number(savedJobbingPoint || 0);
-                if (jpValue > 0 && closedLtp > 0) {
-                    if (orderSide === 'BUY') closedLtp = closedLtp - jpValue;
-                    else closedLtp = closedLtp + jpValue;
+                    // --- Apply Jobbing Point (separate exit-time deduction) ---
+                    const jpValue = Number(savedJobbingPoint || 0);
+                    if (jpValue > 0 && closedLtp > 0) {
+                        if (orderSide === 'BUY') closedLtp = closedLtp - jpValue;
+                        else closedLtp = closedLtp + jpValue;
+                    }
                 }
 
                 payload = {
@@ -350,7 +366,7 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
         <div className="fixed inset-0 z-[60] bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans flex flex-col overflow-hidden animate-in fade-in duration-300">
             <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-card)]/50">
                 <div className="flex flex-col">
-                    <h3 className="text-lg font-black text-[var(--text-primary)] leading-tight">{tradingsymbol}</h3>
+                    <h3 className="text-lg font-black text-[var(--text-primary)] leading-tight">{formatTradingSymbol(tradingsymbol)}</h3>
                     <div className="flex items-center gap-2">
                         <span className={`text-[9px] font-black uppercase px-1 rounded ${isBuy ? 'bg-[var(--gain-chip-bg)] text-[var(--gain-text)]' : 'bg-[var(--loss-chip-bg)] text-[var(--loss-text)]'}`}>
                             {orderSide}
@@ -434,14 +450,21 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
                                                         broker_id_str: brokerId,
                                                         customer_id_str: customerId,
                                                         jobbing_point: jobbingPointInput ? Number(jobbingPointInput) : 0,
+                                                        jobbing_applied_ltp: Number(currentPrice || 0),
                                                     })
                                                 });
                                                 if (res.ok) {
                                                     const jpVal = Number(jobbingPointInput) || 0;
+                                                    const jpLtp = Number(currentPrice || 0);
                                                     setSavedJobbingPoint(jpVal);
+                                                    setJobbingAppliedLtpState(jpLtp);
+                                                    if (jpVal > 0) {
+                                                        setSavedCustomerExitPrice(0);
+                                                        setCustomerExitPriceInput('');
+                                                    }
                                                     setFeedback({ type: 'success', message: 'Jobbing Point saved!' });
                                                     window.dispatchEvent(new CustomEvent('orders:changed', {
-                                                        detail: { order: { ...selectedOrder, jobbing_point: jpVal } }
+                                                        detail: { order: { ...selectedOrder, jobbing_point: jpVal, jobbing_applied_ltp: jpLtp, customer_exit_price: jpVal > 0 ? 0 : savedCustomerExitPrice } }
                                                     }));
                                                 } else {
                                                     setFeedback({ type: 'error', message: 'Failed to save' });
@@ -458,6 +481,52 @@ export default function HoldOrderBottomWindow({ selectedOrder, onClose, sheetDat
                                 </span>
                                 <input type="number" min="0" value={jobbingPointInput} onChange={(e) => setJobbingPointInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" placeholder="0" />
                             </div>
+                        </div>
+                    )}
+                    {userRole === 'broker' && (
+                        <div className="bg-[var(--bg-card)] px-3 py-2.5 rounded-xl border border-[var(--border-color)]">
+                            <span className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1 flex justify-between items-center">
+                                Customer Exit Price 
+                                <button 
+                                    onClick={async () => {
+                                        setSavingCEP(true);
+                                        try {
+                                            const res = await fetch(`${apiBase.replace(/\/$/, "")}/api/orders/updateOrder`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                                                body: JSON.stringify({
+                                                    order_id: selectedOrder._id,
+                                                    broker_id_str: brokerId,
+                                                    customer_id_str: customerId,
+                                                    customer_exit_price: customerExitPriceInput ? Number(customerExitPriceInput) : 0,
+                                                })
+                                            });
+                                            if (res.ok) {
+                                                const cepVal = Number(customerExitPriceInput) || 0;
+                                                setSavedCustomerExitPrice(cepVal);
+                                                if (cepVal > 0) {
+                                                    setSavedJobbingPoint(0);
+                                                    setJobbingPointInput('');
+                                                    setJobbingAppliedLtpState(0);
+                                                }
+                                                setFeedback({ type: 'success', message: 'Customer Exit Price saved!' });
+                                                window.dispatchEvent(new CustomEvent('orders:changed', {
+                                                    detail: { order: { ...selectedOrder, customer_exit_price: cepVal, jobbing_point: cepVal > 0 ? 0 : savedJobbingPoint, jobbing_applied_ltp: cepVal > 0 ? 0 : jobbingAppliedLtpState } }
+                                                }));
+                                            } else {
+                                                setFeedback({ type: 'error', message: 'Failed to save' });
+                                            }
+                                        } catch { setFeedback({ type: 'error', message: 'Network error' }); }
+                                        setSavingCEP(false);
+                                        setTimeout(() => setFeedback(null), 2000);
+                                    }}
+                                    disabled={savingCEP}
+                                    className="px-2 py-0.5 bg-[var(--gain-chip-bg)] text-[var(--gain-text)] text-[9px] font-black rounded hover:bg-[var(--gain-chip-bg)]/30 transition-colors uppercase disabled:opacity-50"
+                                >
+                                    {savingCEP ? '...' : 'Save'}
+                                </button>
+                            </span>
+                            <input type="number" min="0" value={customerExitPriceInput} onChange={(e) => setCustomerExitPriceInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" placeholder="0.00" />
                         </div>
                     )}
                 </div>

@@ -3,7 +3,8 @@ import {
     deleteBroker, 
     getDeletedBrokers, 
     restoreBroker, 
-    permanentDeleteBroker 
+    permanentDeleteBroker,
+    toggleBanBroker
 } from '../Controllers/SuperBrocker.js';
 
 const router = express.Router();
@@ -19,5 +20,8 @@ router.post('/restore-broker/:id', restoreBroker);
 
 // Permanently delete a broker
 router.delete('/permanent-delete/:id', permanentDeleteBroker);
+
+// Toggle ban status for a broker
+router.post('/toggle-ban-broker/:id', toggleBanBroker);
 
 export default router;

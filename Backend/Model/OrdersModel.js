@@ -101,6 +101,18 @@ const OrderSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // LTP at the time the jobbing point was set/saved
+    jobbing_applied_ltp: {
+      type: Number,
+      default: 0,
+    },
+
+    // Fixed exit price set by broker for the customer
+    customer_exit_price: {
+      type: Number,
+      default: 0,
+    },
+
     // --- Broker/Exchange references (real execution mode) ---
     broker_order_id: { type: String, index: true },
     exchange_order_id: { type: String, index: true },

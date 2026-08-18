@@ -8,7 +8,7 @@ function generateId() {
 }
 
 const CustomerSchema = new Schema({
-    // 🔑 PRIMARY LOGIN IDENTIFIER: Customer ID (10 Digits)
+    // PRIMARY LOGIN IDENTIFIER: Customer ID (10 Digits)
     customer_id: {
         type: String,
         required: true,
@@ -33,17 +33,21 @@ const CustomerSchema = new Schema({
         immutable: true,
     },
     
-    // 🔗 BROKER LINKAGE: Broker Model ko reference karega
+    //  BROKER LINKAGE: Broker Model ko reference karega
     attached_broker_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Broker', // Yeh field 'Broker' collection (Model) ko point karegi
         required: true, // Customer hamesha kisi Broker se attached hoga
     },
 
-    // 📷 PROFILE PHOTO: Cloudinary URL
+    //  PROFILE PHOTO: Cloudinary URL
     profile_photo: {
         type: String,
         default: null,
+    },
+    is_banned: {
+        type: Boolean,
+        default: false
     },
 
     // NOTE: 'timestamps: true' set hai, jo automatic 'createdAt' aur 'updatedAt' field banata hai.

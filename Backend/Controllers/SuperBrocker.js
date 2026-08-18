@@ -23,7 +23,7 @@ const getBrokers = asyncHandler(async (req, res) => {
         organization_name: broker.organization_name, // Optional: return if needed
         password: broker.password,
         joining_date: broker.createdAt ? broker.createdAt.toISOString().split('T')[0] : 'N/A',
-        status: 'Active',
+        status: broker.is_banned ? 'Banned' : 'Active',
     }));
 
     console.log(formattedBrokers)
@@ -412,4 +412,24 @@ const permanentDeleteBroker = asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, message: 'Broker and all associated data PERMANENTLY deleted.' });
 });
 
-export { addBroker, getBrokers, deleteBroker, getDeletedBrokers, restoreBroker, permanentDeleteBroker };
+// @desc    Toggle Ban status for a Broker
+// @route   POST /api/superbroker/toggle-ban-broker/:id
+const toggleBanBroker = asyncHandler(async (req, res) => {
+    const brokerLoginId = req.params.id;
+
+    let broker = await BrokerModel.findOne({ login_id: brokerLoginId });
+    if (!broker) {
+        return res.status(404).json({ success: false, message: 'Broker not found.' });
+    }
+
+    broker.is_banned = !broker.is_banned;
+    await broker.save();
+
+    res.status(200).json({
+        success: true,
+        message: `Broker account has been ${broker.is_banned ? 'banned' : 'unbanned'} successfully.`,
+        is_banned: broker.is_banned
+    });
+});
+
+export { addBroker, getBrokers, deleteBroker, getDeletedBrokers, restoreBroker, permanentDeleteBroker, toggleBanBroker };

@@ -103,6 +103,13 @@ const handleUserLogin = asyncHandler(async (req, res) => {
     return res.status(404).json({ success: false, message: 'Invalid ID. User not found.' });
   }
 
+  if (user.is_banned) {
+    return res.status(403).json({
+      success: false,
+      message: role === 'customer' ? 'Your account has been banned. Contact your broker.' : 'Your broker account has been banned. Contact Super Broker.'
+    });
+  }
+
   const storedPassword = user.password;
   if (!storedPassword) {
     return res.status(500).json({

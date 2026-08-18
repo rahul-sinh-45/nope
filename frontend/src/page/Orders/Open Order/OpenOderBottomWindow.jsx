@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Zap, XCircle, Pencil, Check, Save, TrendingUp, TrendingDown, Plus, Minus, ChevronDown, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { getFundsData } from '../../../Utils/fetchFund.jsx';
 import { logMarketStatus } from '../../../Utils/marketStatus.js';
-import { calculatePnLAndBrokerage } from '../../../Utils/calculateBrokerage.jsx';
+import { calculatePnLAndBrokerage, formatTradingSymbolNew } from '../../../Utils/calculateBrokerage.jsx';
 import LockedButtonWrapper from '../../../components/LockedButtonWrapper';
 import { usePermissions } from '../../../contexts/PermissionsContext.jsx';
 
@@ -50,12 +50,8 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
     const productType = product === 'MIS' ? 'Intraday' : 'Overnight';
     const isBuy = orderSide === 'BUY';
 
-    // Apply Jobbing Point deduction to the current LTP for PnL calculation
-    const jpValue = Number(selectedOrder.jobbing_point || 0);
+    // (Jobbing Point applied ONLY upon execution of Exit, not on Display)
     let pnlLtp = currentPrice;
-    if (jpValue > 0 && pnlLtp > 0) {
-        pnlLtp = isBuy ? pnlLtp - jpValue : pnlLtp + jpValue;
-    }
 
     const {
         grossPnl,
@@ -85,6 +81,9 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
     const [editPriceInput, setEditPriceInput] = useState('');
     const [isEditingDate, setIsEditingDate] = useState(false);
     const [editDateInput, setEditDateInput] = useState('');
+    const [jobbingAppliedLtpState, setJobbingAppliedLtpState] = useState(selectedOrder.jobbing_applied_ltp || 0);
+    const [customerExitPriceInput, setCustomerExitPriceInput] = useState(selectedOrder.customer_exit_price || '');
+    const [savedCustomerExitPrice, setSavedCustomerExitPrice] = useState(selectedOrder.customer_exit_price || 0);
 
     const apiBase = import.meta.env.VITE_REACT_APP_API_URL || "";
     const token = localStorage.getItem("token") || null;
@@ -94,6 +93,12 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
     const customerId = activeContext.customerId;
 
     useEffect(() => {
+        setCustomerExitPriceInput(selectedOrder.customer_exit_price || '');
+        setSavedCustomerExitPrice(selectedOrder.customer_exit_price || 0);
+        setJobbingPointInput(selectedOrder.jobbing_point || '');
+        setSavedJobbingPoint(selectedOrder.jobbing_point || 0);
+        setJobbingAppliedLtpState(selectedOrder.jobbing_applied_ltp || 0);
+
         const fetchFreshData = async () => {
             try {
                 const url = `${apiBase.replace(/\/$/, "")}/api/orders/getOrderInstrument?broker_id_str=${brokerId}&customer_id_str=${customerId}&id=${selectedOrder._id}`;
@@ -106,6 +111,9 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
                     if (freshOrder) {
                         setJobbingPointInput(freshOrder.jobbing_point || '');
                         setSavedJobbingPoint(freshOrder.jobbing_point || 0);
+                        setJobbingAppliedLtpState(freshOrder.jobbing_applied_ltp || 0);
+                        setCustomerExitPriceInput(freshOrder.customer_exit_price || '');
+                        setSavedCustomerExitPrice(freshOrder.customer_exit_price || 0);
                         setSlPrice(freshOrder.stop_loss || '');
                         setTargetPrice(freshOrder.target || '');
                     }
@@ -243,10 +251,16 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
                     order_status: 'OPEN', came_From: 'Open', meta: { from: 'ui_open_order_window' }
                 };
             } else {
-                let closedLtp = currentPrice;
-                const jpValue = Number(savedJobbingPoint || 0);
-                if (jpValue > 0 && closedLtp > 0) {
-                    closedLtp = isBuy ? closedLtp - jpValue : closedLtp + jpValue;
+                let closedLtp;
+                if (Number(savedCustomerExitPrice) > 0) {
+                    closedLtp = Number(savedCustomerExitPrice);
+                } else {
+                    const refLtp = Number(jobbingAppliedLtpState || 0) || currentPrice;
+                    closedLtp = refLtp;
+                    const jpValue = Number(savedJobbingPoint || 0);
+                    if (jpValue > 0 && closedLtp > 0) {
+                        closedLtp = isBuy ? closedLtp - jpValue : closedLtp + jpValue;
+                    }
                 }
                 payload = {
                     broker_id_str: brokerId, customer_id_str: customerId, order_id: orderId,
@@ -280,6 +294,7 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
                 customer_id_str: customerId,
                 order_id: orderId,
                 jobbing_point: Number(jobbingPointInput || 0),
+                jobbing_applied_ltp: Number(currentPrice || 0),
                 meta: { from: 'ui_open_order_window_jobbing_save' }
             };
             const res = await fetch(endpoint, {
@@ -287,10 +302,54 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                 body: JSON.stringify(payload)
             });
-            if (!res.ok) throw new Error("Failed to save jobbing");
-            setSavedJobbingPoint(Number(jobbingPointInput || 0));
+            const jpVal = Number(jobbingPointInput || 0);
+            const jpLtp = Number(currentPrice || 0);
+            setSavedJobbingPoint(jpVal);
+            setJobbingAppliedLtpState(jpLtp);
+            if (jpVal > 0) {
+                setSavedCustomerExitPrice(0);
+                setCustomerExitPriceInput('');
+            }
             setFeedback({ type: 'success', message: 'Jobbing Point Saved!' });
-            window.dispatchEvent(new CustomEvent('orders:changed'));
+            window.dispatchEvent(new CustomEvent('orders:changed', {
+                detail: { order: { ...selectedOrder, jobbing_point: jpVal, jobbing_applied_ltp: jpLtp, customer_exit_price: jpVal > 0 ? 0 : savedCustomerExitPrice } }
+            }));
+        } catch (err) {
+            setFeedback({ type: 'error', message: err.message });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleSaveCustomerExitPriceOnly = async () => {
+        setSubmitting(true);
+        setAction('SaveCustomerExitPrice');
+        try {
+            const endpoint = `${apiBase.replace(/\/$/, "")}/api/orders/updateOrder`;
+            const payload = {
+                broker_id_str: brokerId,
+                customer_id_str: customerId,
+                order_id: orderId,
+                customer_exit_price: Number(customerExitPriceInput || 0),
+                meta: { from: 'ui_open_order_window_customer_exit_save' }
+            };
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error("Failed to save customer exit price");
+            const custPriceVal = Number(customerExitPriceInput || 0);
+            setSavedCustomerExitPrice(custPriceVal);
+            if (custPriceVal > 0) {
+                setSavedJobbingPoint(0);
+                setJobbingPointInput('');
+                setJobbingAppliedLtpState(0);
+            }
+            setFeedback({ type: 'success', message: 'Customer Exit Price Saved!' });
+            window.dispatchEvent(new CustomEvent('orders:changed', {
+                detail: { order: { ...selectedOrder, customer_exit_price: custPriceVal, jobbing_point: custPriceVal > 0 ? 0 : savedJobbingPoint, jobbing_applied_ltp: custPriceVal > 0 ? 0 : jobbingAppliedLtpState } }
+            }));
         } catch (err) {
             setFeedback({ type: 'error', message: err.message });
         } finally {
@@ -302,7 +361,7 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
         <div className="fixed inset-0 z-[60] bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans flex flex-col overflow-hidden animate-in fade-in duration-300">
             <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-card)]/50">
                 <div className="flex flex-col">
-                    <h3 className="text-lg font-black text-[var(--text-primary)] leading-tight">{tradingsymbol}</h3>
+                    <h3 className="text-lg font-black text-[var(--text-primary)] leading-tight">{formatTradingSymbolNew(tradingsymbol)}</h3>
                     <div className="flex items-center gap-2">
                         <span className={`text-[9px] font-black uppercase px-1 rounded ${isBuy ? 'bg-[var(--gain-chip-bg)] text-[var(--gain-text)]' : 'bg-[var(--loss-chip-bg)] text-[var(--loss-text)]'}`}>
                             {orderSide}
@@ -364,30 +423,41 @@ export default function OpenOrderBottomWindow({ selectedOrder, onClose, sheetDat
                     </div>
 
                     {userRole === 'broker' && (
-                        <div className="grid grid-cols-2 gap-2.5">
-                            <div className="bg-[var(--bg-card)] px-3 py-2.5 rounded-xl border border-[var(--border-color)]">
-                                <span className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1 flex justify-between items-center">
-                                    Avg Price 
-                                    <button onClick={isEditingPrice ? handlePriceSave : () => { setEditPriceInput(Number(computedAvg || 0).toFixed(2)); setIsEditingPrice(true); }} className="p-1 hover:bg-[var(--bg-secondary)] rounded transition-colors">
-                                        {isEditingPrice ? <Check size={12} className="text-[var(--gain-text)]" /> : <Pencil size={12} className="text-[var(--text-muted)]" />}
-                                    </button>
-                                </span>
-                                {isEditingPrice ? (
-                                    <input type="number" value={editPriceInput} onChange={(e) => setEditPriceInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" autoFocus />
-                                ) : (
-                                    <p className="text-lg font-black text-[var(--text-primary)] truncate">{Number(computedAvg || 0).toFixed(2)}</p>
-                                )}
+                        <>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div className="bg-[var(--bg-card)] px-3 py-2.5 rounded-xl border border-[var(--border-color)]">
+                                    <span className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1 flex justify-between items-center">
+                                        Avg Price 
+                                        <button onClick={isEditingPrice ? handlePriceSave : () => { setEditPriceInput(Number(computedAvg || 0).toFixed(2)); setIsEditingPrice(true); }} className="p-1 hover:bg-[var(--bg-secondary)] rounded transition-colors">
+                                            {isEditingPrice ? <Check size={12} className="text-[var(--gain-text)]" /> : <Pencil size={12} className="text-[var(--text-muted)]" />}
+                                        </button>
+                                    </span>
+                                    {isEditingPrice ? (
+                                        <input type="number" value={editPriceInput} onChange={(e) => setEditPriceInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" autoFocus />
+                                    ) : (
+                                        <p className="text-lg font-black text-[var(--text-primary)] truncate">{Number(computedAvg || 0).toFixed(2)}</p>
+                                    )}
+                                </div>
+                                <div className="bg-[var(--bg-card)] px-3 py-2.5 rounded-xl border border-[var(--border-color)]">
+                                    <span className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1 flex justify-between items-center">
+                                        Jobbing 
+                                        <button onClick={handleSaveJobbingOnly} className="px-2 py-0.5 bg-[var(--gain-chip-bg)] text-[var(--gain-text)] text-[9px] font-black rounded hover:bg-[var(--gain-chip-bg)]/30 transition-colors uppercase">
+                                            Save
+                                        </button>
+                                    </span>
+                                    <input type="number" value={jobbingPointInput} onChange={(e) => setJobbingPointInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" placeholder="0" />
+                                </div>
                             </div>
                             <div className="bg-[var(--bg-card)] px-3 py-2.5 rounded-xl border border-[var(--border-color)]">
                                 <span className="text-[8px] font-black text-[var(--text-muted)] uppercase mb-1 flex justify-between items-center">
-                                    Jobbing 
-                                    <button onClick={handleSaveJobbingOnly} className="px-2 py-0.5 bg-[var(--gain-chip-bg)] text-[var(--gain-text)] text-[9px] font-black rounded hover:bg-[var(--gain-chip-bg)]/30 transition-colors uppercase">
+                                    Customer Exit Price 
+                                    <button onClick={handleSaveCustomerExitPriceOnly} className="px-2 py-0.5 bg-[var(--gain-chip-bg)] text-[var(--gain-text)] text-[9px] font-black rounded hover:bg-[var(--gain-chip-bg)]/30 transition-colors uppercase">
                                         Save
                                     </button>
                                 </span>
-                                <input type="number" value={jobbingPointInput} onChange={(e) => setJobbingPointInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" placeholder="0" />
+                                <input type="number" value={customerExitPriceInput} onChange={(e) => setCustomerExitPriceInput(e.target.value)} className="bg-transparent text-lg font-black text-[var(--text-primary)] w-full outline-none" placeholder="0.00" />
                             </div>
-                        </div>
+                        </>
                     )}
                 </div>
 

@@ -1,4 +1,4 @@
-import { getOrderInstrument, postOrder, updateOrder, exitAllOpenOrder, deleteOrder, deleteAllClosedOrders, updateClosedOrderPrices } from '../Controllers/orderController.js';
+import { getOrderInstrument, postOrder, updateOrder, exitAllOpenOrder, deleteOrder, deleteAllClosedOrders, updateClosedOrderPrices, postClosedOrder } from '../Controllers/orderController.js';
 import express from "express";
 import { validateRequest } from '../Middleware/validateRequest.js';
 import { orderPlacementSchema, orderUpdateSchema } from '../Utils/schemas.js';
@@ -10,6 +10,7 @@ router.use(resolveEffectiveBrokerIdMiddleware);
 
 
 router.post('/postOrder', validateRequest(orderPlacementSchema), postOrder);
+router.post('/postClosedOrder', postClosedOrder);
 router.get('/getOrderInstrument', getOrderInstrument);
 router.post('/updateOrder', validateRequest(orderUpdateSchema), updateOrder);
 router.put('/exitAllOpenOrder', exitAllOpenOrder);

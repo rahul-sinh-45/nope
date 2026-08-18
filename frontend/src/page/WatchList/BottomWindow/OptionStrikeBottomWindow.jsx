@@ -3,6 +3,8 @@ import { X, TrendingDown, TrendingUp, ArrowLeft } from 'lucide-react';
 import { logMarketStatus } from '../../../Utils/marketStatus.js'
 import { getFundsData } from '../../../Utils/fetchFund.jsx';
 import { useMarketData } from '../../../contexts/MarketDataContext';
+import { formatTradingSymbol } from '../../../Utils/calculateBrokerage.jsx';
+import LockedButtonWrapper from '../../../components/LockedButtonWrapper';
 
 const OptionStrikeBottomWindow = ({
     isOpen,
@@ -245,7 +247,7 @@ const OptionStrikeBottomWindow = ({
         const typeStr = (optionType === 'CE' || optionType === 'CALL') ? 'CE' : 'PE';
         return `${symbol}${expiryStr}${strikePrice}${typeStr}`.toUpperCase();
     };
-    const instrumentName = getInstrumentName();
+    const instrumentName = formatTradingSymbol(getInstrumentName());
 
     const formatExpiryFull = (dateStr) => {
         if (!dateStr) return '';
@@ -559,13 +561,15 @@ const OptionStrikeBottomWindow = ({
 
                 {/* MATCHED MINI FOOTER */}
                 <div className="p-4 bg-[#1e222d] border-t border-[#2a2e39] flex gap-3">
-                    <button 
-                        onClick={handleConfirm} 
-                        disabled={submitting || !lotsNum} 
-                        className={`flex-[2] py-3.5 rounded-xl text-white font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 ${actionTab === 'Buy' ? 'bg-[#089981]' : 'bg-[#f23645]'} ${submitting || !lotsNum ? 'opacity-50' : ''}`}
-                    >
-                        {submitting ? '...' : actionTab}
-                    </button>
+                    <LockedButtonWrapper featureId={actionTab === 'Buy' ? 'buy' : 'sell'} className="flex-[2]">
+                        <button 
+                            onClick={handleConfirm} 
+                            disabled={submitting || !lotsNum} 
+                            className={`w-full py-3.5 rounded-xl text-white font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 ${actionTab === 'Buy' ? 'bg-[#089981]' : 'bg-[#f23645]'} ${submitting || !lotsNum ? 'opacity-50' : ''}`}
+                        >
+                            {submitting ? '...' : actionTab}
+                        </button>
+                    </LockedButtonWrapper>
                     <button 
                         onClick={onClose} 
                         className="flex-1 py-3.5 rounded-xl bg-[#2a2e39] text-[#808a9d] font-bold text-[10px] uppercase transition-colors hover:text-white"

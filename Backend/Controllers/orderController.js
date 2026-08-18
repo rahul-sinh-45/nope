@@ -412,8 +412,26 @@ const updateOrder = asyncHandler(async (req, res) => {
   // 👇 SL/Target update
   if (stop_loss !== undefined) update.stop_loss = Number(stop_loss);
   if (target !== undefined) update.target = Number(target);
-  // Jobbing Point update (check both req.body and rest to avoid duplicate)
-  if (req.body.jobbing_point !== undefined) update.jobbing_point = Number(req.body.jobbing_point);
+  // Jobbing Point and Customer Exit Price updates with mutual exclusivity logic
+  if (req.body.customer_exit_price !== undefined) {
+    const custPrice = Number(req.body.customer_exit_price);
+    update.customer_exit_price = custPrice;
+    if (custPrice > 0) {
+      update.jobbing_point = 0;
+      update.jobbing_applied_ltp = 0;
+    }
+  }
+
+  if (req.body.jobbing_point !== undefined) {
+    const jpValue = Number(req.body.jobbing_point);
+    update.jobbing_point = jpValue;
+    if (jpValue > 0) {
+      update.customer_exit_price = 0;
+    }
+  }
+  if (req.body.jobbing_applied_ltp !== undefined) {
+    update.jobbing_applied_ltp = Number(req.body.jobbing_applied_ltp);
+  }
 
   update.updatedAt = new Date();
 
@@ -600,15 +618,7 @@ const updateOrder = asyncHandler(async (req, res) => {
 
 
     else if (update.order_status === 'CLOSED' && existing.order_status === 'OPEN' && existingIsIntraday) {
-
-      const marginToRelease = existing.margin_blocked || (existing.price * existing.quantity);
-
-      if (marginToRelease > 0) {
-        // For intraday we reduce used_limit by the blocked margin (i.e. free up the limit)
-        fund.intraday.used_limit -= marginToRelease;
-        if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
-      }
-
+      // Do NOT release margin back to the used_limit when order is CLOSED!
       // Ensure we clear margin_blocked on the order
       update.margin_blocked = 0;
     }
@@ -623,11 +633,14 @@ const updateOrder = asyncHandler(async (req, res) => {
       const marginToRelease = existing.margin_blocked || (existing.price * existing.quantity);
 
       if (marginToRelease > 0) {
-        if (isIntraday) {
-          fund.intraday.used_limit -= marginToRelease;
-          if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
-        } else {
-          fund.overnight.available_limit += marginToRelease;
+        // Only release margin back to available/used limit if the status changes to RESTRICTED (not CLOSED)
+        if (update.order_status === 'RESTRICTED') {
+          if (isIntraday) {
+            fund.intraday.used_limit -= marginToRelease;
+            if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
+          } else {
+            fund.overnight.available_limit += marginToRelease;
+          }
         }
       }
 
@@ -727,10 +740,17 @@ const exitAllOpenOrder = asyncHandler(async (req, res) => {
 
     let finalExitPrice = Number(exitPrice);
 
-    // Apply Jobbing Point (₹ amount)
-    const jpValue = Number(order.jobbing_point || 0);
-    if (jpValue > 0 && finalExitPrice > 0) {
-      finalExitPrice = order.side === 'BUY' ? finalExitPrice - jpValue : finalExitPrice + jpValue;
+    const custExitPrice = Number(order.customer_exit_price) || 0;
+    if (custExitPrice > 0) {
+      finalExitPrice = custExitPrice;
+    } else {
+      // Apply Jobbing Point (₹ amount)
+      const refLtp = Number(order.jobbing_applied_ltp || 0) || finalExitPrice;
+      finalExitPrice = refLtp;
+      const jpValue = Number(order.jobbing_point || 0);
+      if (jpValue > 0 && finalExitPrice > 0) {
+        finalExitPrice = order.side === 'BUY' ? finalExitPrice - jpValue : finalExitPrice + jpValue;
+      }
     }
 
     const closedLtp = finalExitPrice > 0 ? Number(finalExitPrice.toFixed(4)) : 0;
@@ -770,11 +790,11 @@ const exitAllOpenOrder = asyncHandler(async (req, res) => {
       await Order.bulkWrite(bulkOps);
     }
 
-    // Update fund in one save (release all margin at once)
-    fund.intraday = fund.intraday || { used_limit: 0, available_limit: 0 };
-    fund.intraday.used_limit = Math.max(0, Number(fund.intraday.used_limit || 0) - totalMarginToRelease);
+    // Do NOT release margin on exit-all!
+    // fund.intraday = fund.intraday || { used_limit: 0, available_limit: 0 };
+    // fund.intraday.used_limit = Math.max(0, Number(fund.intraday.used_limit || 0) - totalMarginToRelease);
     // fund.net_pnl = (fund.net_pnl || 0) + totalPnl;
-    await fund.save();
+    // await fund.save();
 
   } catch (err) {
     console.error("Failed to bulk update orders/fund:", err);
@@ -903,4 +923,66 @@ const updateClosedOrderPrices = asyncHandler(async (req, res) => {
   return res.status(200).json({ success: true, message: "Prices updated successfully", order });
 });
 
-export { getOrderInstrument, postOrder, updateOrder, exitAllOpenOrder, deleteOrder, deleteAllClosedOrders, updateClosedOrderPrices };
+const postClosedOrder = asyncHandler(async (req, res) => {
+  const {
+    broker_id_str,
+    customer_id_str,
+    symbol,
+    segment = "NSE",
+    side,
+    product = "MIS",
+    price = 0,        // Entry price
+    closed_ltp = 0,   // Exit price
+    quantity,
+    lots = 1,
+    lot_size = 1,
+    instrument_token = "0", // Fallback to 0 if not provided
+    placed_at,
+    closed_at,
+    expire,
+    came_From,
+    meta = {}
+  } = req.body;
+
+  if (!broker_id_str || !customer_id_str) {
+    return res.status(400).json({ error: "broker_id_str and customer_id_str are required" });
+  }
+  if (!symbol) {
+    return res.status(400).json({ error: "symbol is required" });
+  }
+  if (!side || !["BUY", "SELL"].includes(side)) {
+    return res.status(400).json({ error: "side must be BUY or SELL" });
+  }
+  
+  const qty = Number(quantity) || (Number(lots) * Number(lot_size)) || 1;
+  const entryPrice = Number(price) || 0;
+  const exitPrice = Number(closed_ltp) || 0;
+
+  const orderData = {
+    broker_id_str,
+    customer_id_str,
+    instrument_token: String(instrument_token),
+    symbol: String(symbol).toUpperCase().trim(),
+    segment: String(segment).toUpperCase().trim(),
+    side: String(side).toUpperCase(),
+    product: String(product).toUpperCase(),
+    price: entryPrice,
+    closed_ltp: exitPrice,
+    quantity: qty,
+    lots: Number(lots) || 1,
+    lot_size: Number(lot_size) || 1,
+    order_status: "CLOSED",
+    placed_at: placed_at ? new Date(placed_at) : new Date(),
+    closed_at: closed_at ? new Date(closed_at) : new Date(),
+    came_From: came_From || "Open",
+    expire: expire ? new Date(expire) : null,
+    meta: { ...meta, from: "broker_manual_form" }
+  };
+
+  const newOrder = new Order(orderData);
+  await newOrder.save();
+
+  return res.status(200).json({ success: true, message: "Manual closed order created successfully", order: newOrder });
+});
+
+export { getOrderInstrument, postOrder, updateOrder, exitAllOpenOrder, deleteOrder, deleteAllClosedOrders, updateClosedOrderPrices, postClosedOrder };

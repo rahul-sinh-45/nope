@@ -47,6 +47,8 @@ const releaseFundsOnSquareoff = async (order, exitPrice) => {
 
         const isIntraday = (order.product === 'MIS' || order.came_From === 'Hold' || order.order_status === 'HOLD');
 
+        // Do NOT release margin on auto-squareoff exits!
+        /*
         if (marginToRelease > 0) {
             if (isIntraday) {
                 // 2. Used Limit kam karo
@@ -72,6 +74,7 @@ const releaseFundsOnSquareoff = async (order, exitPrice) => {
             await fund.save();
             console.log(`[Squareoff] Funds Released (Margin Only): ${marginToRelease}`);
         }
+        */
     } catch (e) {
         console.error('[Squareoff] Fund Release Error:', e);
     }

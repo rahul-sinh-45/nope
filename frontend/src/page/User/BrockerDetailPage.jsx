@@ -239,6 +239,26 @@ const BrokerDetailsPage = () => {
     // Optional: Show a toast or small notification
   };
 
+  const handleToggleBanBroker = async (broker) => {
+    const url = import.meta.env.VITE_REACT_APP_API_URL || '';
+    try {
+      const response = await axios.post(`${url}/api/superbroker/toggle-ban-broker/${broker.id}`);
+      if (response.data.success) {
+        setBrokers(prev => prev.map(b => {
+          if (b.id === broker.id) {
+            return { ...b, status: response.data.is_banned ? 'Banned' : 'Active' };
+          }
+          return b;
+        }));
+      } else {
+        alert(response.data.message || 'Failed to update ban status.');
+      }
+    } catch (error) {
+      console.error('Toggle ban error:', error);
+      alert('Error updating ban status.');
+    }
+  };
+
   // --- RENDER LOGIC ---
 
   if (loading && brokers.length === 0) {
@@ -317,13 +337,19 @@ const BrokerDetailsPage = () => {
                 )}
               </div>
             </div>
-            <div className="mt-3 flex space-x-2">
+             <div className="mt-3 flex space-x-2">
               <button onClick={() => openBrokerCustomers(broker)} className="bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-4 rounded-md text-sm transition">
                 View Customers
               </button>
               {/* <button onClick={() => handleEdit(broker.id)} className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-4 rounded-md text-sm transition">
                 Edit
               </button> */}
+              <button
+                onClick={() => handleToggleBanBroker(broker)}
+                className={`py-1 px-4 rounded-md text-sm transition font-semibold text-white ${broker.status === 'Banned' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-500/10' : 'bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-500/10'}`}
+              >
+                {broker.status === 'Banned' ? 'Unban' : 'Ban'}
+              </button>
               <button
                 onClick={() => setBrokerToDelete(broker)}
                 className="bg-red-600 hover:bg-red-700 text-white py-1 px-4 rounded-md text-sm transition"

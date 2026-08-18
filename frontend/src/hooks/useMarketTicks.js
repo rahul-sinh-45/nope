@@ -7,9 +7,9 @@ export function useMarketTicks(url, opts = {}) {
   const ticksRef = useRef(new Map());
   const [isConnected, setIsConnected] = useState(false);
 
-  // Track last subscribed instruments for instant refresh on tab return
-  const lastSubscribedRef = useRef([]);
-  const lastSubscriptionTypeRef = useRef('full');
+  // Track all active subscriptions: Map of instrument_token -> subscriptionType
+  const activeSubscriptionsRef = useRef(new Map());
+  const lastMessageTimeRef = useRef(Date.now());
 
   // Store opts in ref to avoid recreating socket on every render
   const optsRef = useRef(opts);
@@ -19,10 +19,12 @@ export function useMarketTicks(url, opts = {}) {
 
   // Stable subscribe function (wrapped in useCallback)
   const subscribe = useCallback(async (list, subscriptionType = 'full') => {
-    // Store for instant refresh on tab visibility change
     if (list && list.length > 0) {
-      lastSubscribedRef.current = list;
-      lastSubscriptionTypeRef.current = subscriptionType;
+      list.forEach(item => {
+        if (item && item.instrument_token) {
+          activeSubscriptionsRef.current.set(String(item.instrument_token), subscriptionType);
+        }
+      });
     }
 
     if (socket.current?.connected) {
@@ -34,6 +36,14 @@ export function useMarketTicks(url, opts = {}) {
 
   // Stable unsubscribe function (wrapped in useCallback)
   const unsubscribe = useCallback(async (list, subscriptionType = 'full') => {
+    if (list && list.length > 0) {
+      list.forEach(item => {
+        if (item && item.instrument_token) {
+          activeSubscriptionsRef.current.delete(String(item.instrument_token));
+        }
+      });
+    }
+
     if (socket.current?.connected) {
       socket.current.emit("unsubscribe", list, subscriptionType);
     }
@@ -41,37 +51,52 @@ export function useMarketTicks(url, opts = {}) {
 
   // INSTANT refresh - called immediately when user returns to tab
   const refreshSubscriptions = useCallback(() => {
-    if (socket.current?.connected && lastSubscribedRef.current.length > 0) {
-      console.log("[useMarketTicks] INSTANT refresh on tab return");
-      socket.current.emit("subscribe", lastSubscribedRef.current, lastSubscriptionTypeRef.current);
+    if (socket.current?.connected && activeSubscriptionsRef.current.size > 0) {
+      console.log("[useMarketTicks] INSTANT refresh on tab return/reconnect for", activeSubscriptionsRef.current.size, "tokens");
+      
+      // Group by subscriptionType
+      const groups = {};
+      activeSubscriptionsRef.current.forEach((type, token) => {
+        if (!groups[type]) {
+          groups[type] = [];
+        }
+        groups[type].push({ instrument_token: token });
+      });
+
+      // Emit subscribe for each group
+      Object.entries(groups).forEach(([type, list]) => {
+        socket.current.emit("subscribe", list, type);
+      });
     }
   }, []);
 
   // Handle visibility change - INSTANT refresh when tab becomes visible
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Tab is now visible - INSTANT refresh
-        console.log("[useMarketTicks] Tab visible - instant refresh");
+    const checkAndRefresh = () => {
+      const timeSinceLastMessage = Date.now() - lastMessageTimeRef.current;
+      console.log(`[useMarketTicks] Tab active check. Time since last message: ${timeSinceLastMessage}ms`);
 
-        if (!socket.current?.connected) {
-          // Socket disconnected - reconnect immediately
-          socket.current?.connect();
-        } else {
-          // Socket connected - refresh subscriptions immediately
-          refreshSubscriptions();
-        }
+      if (!socket.current?.connected) {
+        console.log("[useMarketTicks] Socket not connected, connecting...");
+        socket.current?.connect();
+      } else if (timeSinceLastMessage > 5000) {
+        console.log("[useMarketTicks] Possible zombie connection (no messages for >5s). Forcing reconnect...");
+        socket.current?.disconnect();
+        socket.current?.connect();
+      } else {
+        console.log("[useMarketTicks] Connection active. Refreshing subscriptions...");
+        refreshSubscriptions();
       }
     };
 
-    // Also handle window focus for faster response
-    const handleFocus = () => {
-      console.log("[useMarketTicks] Window focused - instant refresh");
-      if (socket.current?.connected) {
-        refreshSubscriptions();
-      } else {
-        socket.current?.connect();
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkAndRefresh();
       }
+    };
+
+    const handleFocus = () => {
+      checkAndRefresh();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -104,9 +129,20 @@ export function useMarketTicks(url, opts = {}) {
       setIsConnected(true);
 
       // Instant re-subscribe on reconnect
-      if (lastSubscribedRef.current.length > 0) {
+      if (activeSubscriptionsRef.current.size > 0) {
         console.log("[useMarketTicks] Re-subscribing after reconnect");
-        newSocket.emit("subscribe", lastSubscribedRef.current, lastSubscriptionTypeRef.current);
+        
+        const groups = {};
+        activeSubscriptionsRef.current.forEach((type, token) => {
+          if (!groups[type]) {
+            groups[type] = [];
+          }
+          groups[type].push({ instrument_token: token });
+        });
+
+        Object.entries(groups).forEach(([type, list]) => {
+          newSocket.emit("subscribe", list, type);
+        });
       }
     };
 
@@ -116,6 +152,7 @@ export function useMarketTicks(url, opts = {}) {
     };
 
     const onMarketUpdate = (update) => {
+      lastMessageTimeRef.current = Date.now();
       // Kite format: use instrument_token as key
       if (update?.instrument_token !== undefined) {
         // DIRECT MUTATION (0ms latency): Update the Ref instantly

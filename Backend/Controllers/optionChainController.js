@@ -34,7 +34,8 @@ async function getOptionChain(req, res) {
 
         // Determine option segment - normalize FUT to OPT if needed
         // e.g., NFO-FUT -> NFO-OPT, BFO-FUT -> BFO-OPT
-        const optionSegment = segment
+        // Note: Treat 'INDICES' as no segment so we lookup using underlying name
+        const optionSegment = (segment && segment !== 'INDICES')
             ? normalizeToOptionSegment(segment)
             : getOptionSegment(underlyingName);
         console.log('[OptionChainController] Using segment:', optionSegment, '(input was:', segment, ')');
@@ -113,7 +114,7 @@ async function getExpiryList(req, res) {
         }
 
         const underlyingName = name.toUpperCase();
-        const optionSegment = segment
+        const optionSegment = (segment && segment !== 'INDICES')
             ? normalizeToOptionSegment(segment)
             : getOptionSegment(underlyingName);
 

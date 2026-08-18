@@ -80,6 +80,11 @@ export const PermissionsProvider = ({ children }) => {
     }, []);
 
     const isLocked = (featureId) => {
+        const userString = localStorage.getItem('loggedInUser');
+        const userObject = userString ? JSON.parse(userString) : null;
+        if (userObject && userObject.role === 'broker') {
+            return false; // Brokers are NEVER locked/restricted!
+        }
         return !!lockedFeatures[featureId];
     };
 

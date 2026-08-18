@@ -11,6 +11,8 @@ import { logMarketStatus } from '../../Utils/marketStatus';
 import RiskDisclosureModal from './RiskDisclosureModal';
 
 
+import { formatTradingSymbol } from "../../Utils/calculateBrokerage.jsx";
+
 // --- Index Card (Matches image) ---
 const IndexCard = ({ name, price, change, onClick }) => {
   const [flashColor, setFlashColor] = useState("");
@@ -162,8 +164,8 @@ const SwipeableWatchlistItem = ({
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-[#787b86] dark:text-[#787b86] block truncate font-medium">
-              {item.tradingSymbol} • {item.exchange}
+             <span className="text-[10px] text-[#787b86] dark:text-[#787b86] block truncate font-medium">
+              {formatTradingSymbol(item.tradingSymbol)} • {item.exchange}
             </span>
           </div>
           <div className="text-right flex-shrink-0">
@@ -766,7 +768,7 @@ function Watchlist() {
         console.log(`[Watchlist Load] API calls completed in ${fetchElapsed.toFixed(0)}ms`);
 
         // Process indexes - Kite format
-        const priorityIndexes = ["NIFTY 50", "NIFTY BANK", "SENSEX", "BANKEX", "NIFTY FIN SERVICE", "NIFTY MID SELECT"];
+        const priorityIndexes = ["NIFTY 50", "NIFTY BANK", "SENSEX", "BANKEX", "NIFTY FIN SERVICE", "NIFTY MID SELECT", "NIFTY MIDCAP 100"];
         const indexInstrumentsRaw = (indexRes || []).sort((a, b) => {
           const aName = (a.tradingsymbol || a.name || "").toUpperCase();
           const bName = (b.tradingsymbol || b.name || "").toUpperCase();
@@ -1370,6 +1372,7 @@ function Watchlist() {
               let shortName = rawName;
               if (rawName === 'NIFTY 50') shortName = 'NIFTY';
               else if (rawName === 'NIFTY BANK') shortName = 'BANKNIFTY';
+              else if (rawName === 'NIFTY MIDCAP 100' || rawName === 'NIFTY MID SELECT') shortName = 'MIDCPNIFTY';
               else if (rawName.startsWith('NIFTY ')) shortName = rawName.replace('NIFTY ', '');
               return (
                 <IndexCard

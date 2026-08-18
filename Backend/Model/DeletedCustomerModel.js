@@ -97,6 +97,8 @@ const DeletedCustomerSchema = new Schema({
         increase_price: Number,
         jobbin_type: String,
         jobbing_point: Number,
+        jobbing_applied_ltp: Number,
+        customer_exit_price: Number,
         broker_order_id: String,
         exchange_order_id: String,
         notional_value: Number,

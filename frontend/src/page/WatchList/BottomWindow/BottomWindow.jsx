@@ -15,6 +15,7 @@ import SummaryView from './Summery';
 import MarketDepthView from './marketDepth';
 import OptionChainFullscreen from './OptionChainFullscreen';
 import LockedButtonWrapper from '../../../components/LockedButtonWrapper';
+import { formatTradingSymbol } from '../../../Utils/calculateBrokerage.jsx';
 
 function BottomWindow({
   selectedStock,
@@ -278,7 +279,7 @@ function BottomWindow({
               </button>
             )}
             <h3 className="text-[var(--text-primary)] text-base sm:text-lg font-bold truncate">
-              {selectedStock.tradingSymbol || selectedStock.name}
+              {formatTradingSymbol(selectedStock.tradingSymbol || selectedStock.name)}
             </h3>
             {/* Optional: Show LTP/Change here too? */}
           </div>

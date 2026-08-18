@@ -42,6 +42,7 @@ const protect = asyncHandler(async (req, res, next) => {
     }
 
     if (!req.user) return res.status(401).json({ message: 'User not found in database' });
+    if (req.user.is_banned) return res.status(403).json({ message: 'Your account has been banned. Please contact administrator.' });
 
     req.role = decoded.role;
     next();

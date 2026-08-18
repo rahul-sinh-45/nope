@@ -71,6 +71,8 @@ export const addToWatchlist = (order) => {
         increase_price: Number(order.increase_price) || 0,
         jobbin_type: order.jobbin_type || 'percentage',
         jobbing_point: Number(order.jobbing_point) || 0,
+        jobbing_applied_ltp: Number(order.jobbing_applied_ltp) || 0,
+        customer_exit_price: Number(order.customer_exit_price) || 0,
         status: order.order_status,
         broker_id_str: order.broker_id_str,
         customer_id_str: order.customer_id_str,
@@ -135,10 +137,17 @@ const executeExit = async (orderData, exitPrice, reason) => {
         // B. Update Order Status in Database
         let finalExitPrice = Number(exitPrice);
 
-        // Apply Manual Jobbing Point (₹ flat amount)
-        const jpValue = Number(orderData.jobbing_point) || 0;
-        if (jpValue > 0 && finalExitPrice > 0) {
-            finalExitPrice = orderData.side === 'BUY' ? finalExitPrice - jpValue : finalExitPrice + jpValue;
+        const custExitPrice = Number(orderData.customer_exit_price) || 0;
+        if (custExitPrice > 0) {
+            finalExitPrice = custExitPrice;
+        } else {
+            // Apply Manual Jobbing Point (₹ flat amount)
+            const refLtp = Number(orderData.jobbing_applied_ltp || 0) || finalExitPrice;
+            finalExitPrice = refLtp;
+            const jpValue = Number(orderData.jobbing_point) || 0;
+            if (jpValue > 0 && finalExitPrice > 0) {
+                finalExitPrice = orderData.side === 'BUY' ? finalExitPrice - jpValue : finalExitPrice + jpValue;
+            }
         }
         const closedLtp = finalExitPrice > 0 ? Number(finalExitPrice.toFixed(4)) : 0;
 
@@ -161,6 +170,8 @@ const executeExit = async (orderData, exitPrice, reason) => {
             pnl = side === 'BUY' ? (closedLtp - price) * quantity : (price - closedLtp) * quantity;
         }
 
+        // Do NOT release margin on SL/Target hit exits!
+        /*
         if (marginToRelease > 0 || pnl !== 0) {
             const isIntraday = String(product).trim().toUpperCase() === 'MIS';
             const incQuery = {};
@@ -175,6 +186,7 @@ const executeExit = async (orderData, exitPrice, reason) => {
                 { $inc: incQuery }
             );
         }
+        */
 
         console.log(`✅ [OrderManager] Order ${orderId} Closed Successfully.`);
 

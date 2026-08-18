@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useMarketData } from "../../../contexts/MarketDataContext.jsx";
 import { AlertTriangle } from "lucide-react";
 import OpenOrderBottomWindow from "./OpenOderBottomWindow.jsx";
-import { calculatePnLAndBrokerage } from "../../../Utils/calculateBrokerage.jsx";
+import { calculatePnLAndBrokerage, formatTradingSymbolNew } from "../../../Utils/calculateBrokerage.jsx";
 import LockedButtonWrapper from "../../../components/LockedButtonWrapper";
 
 const money = (n) => `₹${Number(n ?? 0).toFixed(2)}`;
@@ -57,9 +57,15 @@ export default function OpenOrder({ filter }) {
       const ltp = Number(data.snapshot?.ltp || data.ltp || data.price || 0);
       const isBuy = String(data.side || "").toUpperCase() === "BUY";
       const jpValue = Number(data.jobbing_point || 0);
-      let closedLtp = ltp;
-      if (jpValue > 0 && closedLtp > 0) {
-        closedLtp = isBuy ? closedLtp - jpValue : closedLtp + jpValue;
+      let closedLtp;
+      if (Number(data.customer_exit_price || 0) > 0) {
+        closedLtp = Number(data.customer_exit_price);
+      } else {
+        const refLtp = Number(data.jobbing_applied_ltp || 0) || ltp;
+        closedLtp = refLtp;
+        if (jpValue > 0 && closedLtp > 0) {
+          closedLtp = isBuy ? closedLtp - jpValue : closedLtp + jpValue;
+        }
       }
 
       const payload = {
@@ -512,12 +518,8 @@ export default function OpenOrder({ filter }) {
           const avg = Number(data.price ?? 0);
           const qty = Number(data?.quantity ?? 0);
 
-          // Apply Jobbing Point deduction to the current LTP for PnL calculation
-          const jpValue = Number(data.jobbing_point || 0);
+          // (Jobbing Point applied ONLY upon execution of Exit, not on Display)
           let pnlLtp = ltp;
-          if (jpValue > 0 && pnlLtp > 0) {
-              pnlLtp = isBuy ? pnlLtp - jpValue : pnlLtp + jpValue;
-          }
 
           const {
             totalBrokerage,
@@ -553,7 +555,7 @@ export default function OpenOrder({ filter }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <h4 className="text-[var(--text-primary)] font-black text-base uppercase tracking-tight truncate">
-                      {tradingsymbol || "—"}
+                      {formatTradingSymbolNew(tradingsymbol) || "—"}
                     </h4>
                     <span className="text-[7px] font-black text-[var(--text-muted)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded uppercase">
                       {data.segment || "NFO"}

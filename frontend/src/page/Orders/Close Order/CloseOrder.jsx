@@ -3,7 +3,7 @@ import { ShoppingCart, DollarSign, Hash, Zap, XCircle, Clock, Layers, RefreshCw,
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import ClosedOrderFilter from "./CloseOrderFilter";
 import { logMarketStatus } from '../../../Utils/marketStatus.js';
-import { calculateExitBrokerageAndPnL } from "../../../Utils/calculateBrokerage.jsx";
+import { calculateExitBrokerageAndPnL, formatTradingSymbol } from "../../../Utils/calculateBrokerage.jsx";
 import Toast from "../../../Utils/Toast";
 import { usePermissions } from '../../../contexts/PermissionsContext.jsx';
 
@@ -102,7 +102,7 @@ const SwipeableClosedOrderItem = ({ data, onSelect, onDelete }) => {
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                             <h4 className="text-[var(--text-primary)] font-black text-base uppercase tracking-tight truncate">
-                                {tradingsymbol || "—"}
+                                {formatTradingSymbol(tradingsymbol) || "—"}
                             </h4>
                             <span className="text-[7px] font-black text-[var(--text-muted)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded uppercase">
                                 {data.segment || "NFO"}
@@ -379,7 +379,7 @@ const ClosedOrderBottomWindow = ({ selectedOrder, onClose }) => {
             {/* Header */}
             <div className="flex justify-between items-start mb-3 border-b border-[var(--border-color)] pb-2">
                 <div className="flex-1 min-w-0 pr-2">
-                    <h3 className="text-base sm:text-lg text-[var(--text-primary)] font-bold tracking-wide truncate">{tradingsymbol}</h3>
+                    <h3 className="text-base sm:text-lg text-[var(--text-primary)] font-bold tracking-wide truncate">{formatTradingSymbol(tradingsymbol)}</h3>
                     <span className="text-xs text-[var(--text-secondary)]">({orderSide})</span>
                 </div>
                 <div className="flex items-center gap-2">
