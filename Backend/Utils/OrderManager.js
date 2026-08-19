@@ -170,23 +170,21 @@ const executeExit = async (orderData, exitPrice, reason) => {
             pnl = side === 'BUY' ? (closedLtp - price) * quantity : (price - closedLtp) * quantity;
         }
 
-        // Do NOT release margin on SL/Target hit exits!
-        /*
-        if (marginToRelease > 0 || pnl !== 0) {
+        if (marginToRelease > 0) {
             const isIntraday = String(product).trim().toUpperCase() === 'MIS';
-            const incQuery = {};
-            if (marginToRelease > 0) {
-                if (isIntraday) incQuery["intraday.used_limit"] = -marginToRelease;
-                else incQuery["overnight.available_limit"] = marginToRelease;
+            const fund = await Fund.findOne({ broker_id_str, customer_id_str });
+            if (fund) {
+                if (isIntraday) {
+                    fund.intraday.used_limit = Math.max(0, (fund.intraday.used_limit || 0) - marginToRelease);
+                    fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
+                } else {
+                    fund.overnight.available_limit = (fund.overnight.available_limit || 0) + marginToRelease;
+                    fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
+                }
+                await fund.save();
+                console.log(`[OrderManager] Fund released for exit: ${marginToRelease}`);
             }
-            // if (pnl !== 0) incQuery["net_pnl"] = pnl;
-
-            await Fund.updateOne(
-                { broker_id_str, customer_id_str },
-                { $inc: incQuery }
-            );
         }
-        */
 
         console.log(`✅ [OrderManager] Order ${orderId} Closed Successfully.`);
 

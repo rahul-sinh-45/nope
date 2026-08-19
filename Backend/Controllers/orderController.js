@@ -193,7 +193,10 @@ const postOrder = asyncHandler(async (req, res) => {
         }
       },
       {
-        $inc: { "intraday.used_limit": requiredMargin }
+        $inc: { 
+          "intraday.used_limit": requiredMargin,
+          "intraday.free_limit": -requiredMargin
+        }
       },
       { new: true }
     );
@@ -206,7 +209,10 @@ const postOrder = asyncHandler(async (req, res) => {
         "overnight.available_limit": { $gte: requiredMargin }
       },
       {
-        $inc: { "overnight.available_limit": -requiredMargin }
+        $inc: { 
+          "overnight.available_limit": -requiredMargin,
+          "overnight.free_limit": -requiredMargin
+        }
       },
       { new: true }
     );
@@ -285,12 +291,22 @@ const postOrder = asyncHandler(async (req, res) => {
     if (isIntraday) {
       await Fund.updateOne(
         { broker_id_str, customer_id_str },
-        { $inc: { "intraday.used_limit": -requiredMargin } }
+        { 
+          $inc: { 
+            "intraday.used_limit": -requiredMargin,
+            "intraday.free_limit": requiredMargin
+          } 
+        }
       );
     } else {
       await Fund.updateOne(
         { broker_id_str, customer_id_str },
-        { $inc: { "overnight.available_limit": requiredMargin } }
+        { 
+          $inc: { 
+            "overnight.available_limit": requiredMargin,
+            "overnight.free_limit": requiredMargin
+          } 
+        }
       );
     }
 
@@ -519,8 +535,10 @@ const updateOrder = asyncHandler(async (req, res) => {
         // Block margin again
         if (isIntraday) {
           fund.intraday.used_limit += marginToDeduct;
+          fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
         } else {
           fund.overnight.available_limit -= marginToDeduct;
+          fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
 
         update.margin_blocked = marginToDeduct;
@@ -606,9 +624,11 @@ const updateOrder = asyncHandler(async (req, res) => {
         if (isIntraday) {
           // Intraday/HOLD: Increase Used Limit
           fund.intraday.used_limit += marginToDeduct;
+          fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
         } else {
           // Overnight (NRML): Decrease Available Limit
           fund.overnight.available_limit -= marginToDeduct;
+          fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
 
         // Record new total margin
@@ -616,12 +636,6 @@ const updateOrder = asyncHandler(async (req, res) => {
       }
     }
 
-
-    else if (update.order_status === 'CLOSED' && existing.order_status === 'OPEN' && existingIsIntraday) {
-      // Do NOT release margin back to the used_limit when order is CLOSED!
-      // Ensure we clear margin_blocked on the order
-      update.margin_blocked = 0;
-    }
 
     else if (update.order_status === 'HOLD' && existing.order_status === 'OPEN' && existingIsIntraday) {
       // Do not touch fund limits; only clear margin on the order
@@ -633,14 +647,14 @@ const updateOrder = asyncHandler(async (req, res) => {
       const marginToRelease = existing.margin_blocked || (existing.price * existing.quantity);
 
       if (marginToRelease > 0) {
-        // Only release margin back to available/used limit if the status changes to RESTRICTED (not CLOSED)
-        if (update.order_status === 'RESTRICTED') {
-          if (isIntraday) {
-            fund.intraday.used_limit -= marginToRelease;
-            if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
-          } else {
-            fund.overnight.available_limit += marginToRelease;
-          }
+        // Release margin back to available/used limit on RESTRICTED or CLOSED (Exit)
+        if (isIntraday) {
+          fund.intraday.used_limit -= marginToRelease;
+          if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
+          fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
+        } else {
+          fund.overnight.available_limit += marginToRelease;
+          fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
       }
 
@@ -790,11 +804,11 @@ const exitAllOpenOrder = asyncHandler(async (req, res) => {
       await Order.bulkWrite(bulkOps);
     }
 
-    // Do NOT release margin on exit-all!
-    // fund.intraday = fund.intraday || { used_limit: 0, available_limit: 0 };
-    // fund.intraday.used_limit = Math.max(0, Number(fund.intraday.used_limit || 0) - totalMarginToRelease);
-    // fund.net_pnl = (fund.net_pnl || 0) + totalPnl;
-    // await fund.save();
+    // Release margin on exit-all and sync free_limit
+    fund.intraday = fund.intraday || { used_limit: 0, available_limit: 0 };
+    fund.intraday.used_limit = Math.max(0, Number(fund.intraday.used_limit || 0) - totalMarginToRelease);
+    fund.intraday.free_limit = Math.max(0, Number(fund.intraday.available_limit || 0) - fund.intraday.used_limit);
+    await fund.save();
 
   } catch (err) {
     console.error("Failed to bulk update orders/fund:", err);
@@ -839,8 +853,10 @@ const deleteOrder = asyncHandler(async (req, res) => {
         const isIntraday = String(order.product).trim().toUpperCase() === 'MIS';
         if (isIntraday) {
           fund.intraday.used_limit = Math.max(0, (fund.intraday.used_limit || 0) - order.margin_blocked);
+          fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
         } else {
           fund.overnight.available_limit = (fund.overnight.available_limit || 0) + order.margin_blocked;
+          fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
         await fund.save();
       }

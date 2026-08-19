@@ -47,34 +47,18 @@ const releaseFundsOnSquareoff = async (order, exitPrice) => {
 
         const isIntraday = (order.product === 'MIS' || order.came_From === 'Hold' || order.order_status === 'HOLD');
 
-        // Do NOT release margin on auto-squareoff exits!
-        /*
         if (marginToRelease > 0) {
             if (isIntraday) {
-                // 2. Used Limit kam karo
-                fund.intraday.used_limit -= marginToRelease;
-                if (fund.intraday.used_limit < 0) fund.intraday.used_limit = 0;
-
-                // 3. Available Limit me wahi margin wapis jod do (No P&L)
-                if (fund.intraday.available_limit !== undefined) {
-                    fund.intraday.available_limit += marginToRelease;
-                } else if (fund.intraday.free_limit !== undefined) {
-                    fund.intraday.free_limit += marginToRelease;
-                }
+                fund.intraday.used_limit = Math.max(0, (fund.intraday.used_limit || 0) - marginToRelease);
+                fund.intraday.free_limit = Math.max(0, (fund.intraday.available_limit || 0) - fund.intraday.used_limit);
             } else {
-                // Overnight Logic
-                fund.overnight.available_limit += marginToRelease; // Paisa wapis
-
-                if (fund.overnight.used_limit) {
-                    fund.overnight.used_limit -= marginToRelease; // Blocked hataya
-                    if (fund.overnight.used_limit < 0) fund.overnight.used_limit = 0;
-                }
+                fund.overnight.available_limit = (fund.overnight.available_limit || 0) + marginToRelease;
+                fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
             }
 
             await fund.save();
             console.log(`[Squareoff] Funds Released (Margin Only): ${marginToRelease}`);
         }
-        */
     } catch (e) {
         console.error('[Squareoff] Fund Release Error:', e);
     }
