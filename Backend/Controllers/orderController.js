@@ -656,6 +656,24 @@ const updateOrder = asyncHandler(async (req, res) => {
           fund.overnight.available_limit += marginToRelease;
           fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
+
+        // Release Option & MCX limits
+        const symUpper = String(existing.symbol).toUpperCase();
+        const isOption = (symUpper.endsWith("CE") || symUpper.endsWith("PE") || symUpper.endsWith("CALL") || symUpper.endsWith("PUT"));
+        const isMcx = String(existing.segment || segment).trim().toUpperCase().includes("MCX");
+        const isMcxOption = isOption && isMcx;
+        const isNormalOption = isOption && !isMcx;
+        const productNorm = String(existing.product).trim().toUpperCase();
+
+        if (isMcxOption) {
+          rollbackMcxOptionUsage(fund, productNorm, marginToRelease);
+        } else if (isNormalOption) {
+          rollbackOptionUsage(fund, productNorm, marginToRelease);
+        }
+
+        if (isMcx) {
+          rollbackMcxUsage(fund, productNorm, marginToRelease);
+        }
       }
 
       // --- 📈 AUTO P&L CALCULATION (ONLY FOR CLOSED, NOT RESTRICTED) ---
@@ -779,6 +797,24 @@ const exitAllOpenOrder = asyncHandler(async (req, res) => {
 
     totalMarginToRelease += marginToRelease;
 
+    // Release Option & MCX limits
+    const symUpper = String(order.symbol).toUpperCase();
+    const isOption = (symUpper.endsWith("CE") || symUpper.endsWith("PE") || symUpper.endsWith("CALL") || symUpper.endsWith("PUT"));
+    const isMcx = String(order.segment).trim().toUpperCase().includes("MCX");
+    const isMcxOption = isOption && isMcx;
+    const isNormalOption = isOption && !isMcx;
+    const productNorm = String(order.product).trim().toUpperCase();
+
+    if (isMcxOption) {
+      rollbackMcxOptionUsage(fund, productNorm, marginToRelease);
+    } else if (isNormalOption) {
+      rollbackOptionUsage(fund, productNorm, marginToRelease);
+    }
+
+    if (isMcx) {
+      rollbackMcxUsage(fund, productNorm, marginToRelease);
+    }
+
     // Add to bulk operation batch
     bulkOps.push({
       updateOne: {
@@ -858,6 +894,25 @@ const deleteOrder = asyncHandler(async (req, res) => {
           fund.overnight.available_limit = (fund.overnight.available_limit || 0) + order.margin_blocked;
           fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
         }
+
+        // Release Option & MCX limits
+        const symUpper = String(order.symbol).toUpperCase();
+        const isOption = (symUpper.endsWith("CE") || symUpper.endsWith("PE") || symUpper.endsWith("CALL") || symUpper.endsWith("PUT"));
+        const isMcx = String(order.segment).trim().toUpperCase().includes("MCX");
+        const isMcxOption = isOption && isMcx;
+        const isNormalOption = isOption && !isMcx;
+        const productNorm = String(order.product).trim().toUpperCase();
+
+        if (isMcxOption) {
+          rollbackMcxOptionUsage(fund, productNorm, order.margin_blocked);
+        } else if (isNormalOption) {
+          rollbackOptionUsage(fund, productNorm, order.margin_blocked);
+        }
+
+        if (isMcx) {
+          rollbackMcxUsage(fund, productNorm, order.margin_blocked);
+        }
+
         await fund.save();
       }
     }

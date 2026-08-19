@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import { getKiteLTP } from '../../services/kiteQuote.js';
 import Order from '../../Model/OrdersModel.js';
 import Fund from '../../Model/FundModel.js';
+import { rollbackOptionUsage } from '../../Utils/OptionLimitManager.js';
+import { rollbackMcxUsage } from '../../Utils/McxLimitManager.js';
+import { rollbackMcxOptionUsage } from '../../Utils/McxOptionLimitManager.js';
 
 // ---------------------------------------------------------
 // 1. HELPER: Fetch Live LTP (Using Kite Quote API)
@@ -54,6 +57,24 @@ const releaseFundsOnSquareoff = async (order, exitPrice) => {
             } else {
                 fund.overnight.available_limit = (fund.overnight.available_limit || 0) + marginToRelease;
                 fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
+            }
+
+            // Rollback Option & MCX daily limits
+            const symUpper = String(order.symbol || "").toUpperCase();
+            const isOption = (symUpper.endsWith("CE") || symUpper.endsWith("PE") || symUpper.endsWith("CALL") || symUpper.endsWith("PUT"));
+            const isMcx = String(order.segment || "").trim().toUpperCase().includes("MCX");
+            const isMcxOption = isOption && isMcx;
+            const isNormalOption = isOption && !isMcx;
+            const productNorm = String(order.product).trim().toUpperCase();
+
+            if (isMcxOption) {
+                rollbackMcxOptionUsage(fund, productNorm, marginToRelease);
+            } else if (isNormalOption) {
+                rollbackOptionUsage(fund, productNorm, marginToRelease);
+            }
+
+            if (isMcx) {
+                rollbackMcxUsage(fund, productNorm, marginToRelease);
             }
 
             await fund.save();

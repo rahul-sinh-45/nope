@@ -1,5 +1,8 @@
 import Order from '../Model/OrdersModel.js';
 import Fund from '../Model/FundModel.js';
+import { rollbackOptionUsage } from './OptionLimitManager.js';
+import { rollbackMcxUsage } from './McxLimitManager.js';
+import { rollbackMcxOptionUsage } from './McxOptionLimitManager.js';
 
 // =========================================================
 // 1. GLOBAL MEMORY (RAM) - THE WATCHLIST
@@ -65,6 +68,8 @@ export const addToWatchlist = (order) => {
     // 3. Store only necessary data
     const triggerData = {
         orderId: String(order._id),
+        symbol: order.symbol,
+        segment: order.segment,
         side: order.side,          // 'BUY' or 'SELL'
         sl: sl,
         target: target,
@@ -181,6 +186,25 @@ const executeExit = async (orderData, exitPrice, reason) => {
                     fund.overnight.available_limit = (fund.overnight.available_limit || 0) + marginToRelease;
                     fund.overnight.free_limit = Math.max(0, (fund.overnight.available_limit || 0) - (fund.overnight.used_limit || 0));
                 }
+
+                // Rollback Option & MCX daily limits
+                const symUpper = String(orderData.symbol || "").toUpperCase();
+                const isOption = (symUpper.endsWith("CE") || symUpper.endsWith("PE") || symUpper.endsWith("CALL") || symUpper.endsWith("PUT"));
+                const isMcx = String(orderData.segment || "").trim().toUpperCase().includes("MCX");
+                const isMcxOption = isOption && isMcx;
+                const isNormalOption = isOption && !isMcx;
+                const productNorm = String(product).trim().toUpperCase();
+
+                if (isMcxOption) {
+                    rollbackMcxOptionUsage(fund, productNorm, marginToRelease);
+                } else if (isNormalOption) {
+                    rollbackOptionUsage(fund, productNorm, marginToRelease);
+                }
+
+                if (isMcx) {
+                    rollbackMcxUsage(fund, productNorm, marginToRelease);
+                }
+
                 await fund.save();
                 console.log(`[OrderManager] Fund released for exit: ${marginToRelease}`);
             }
